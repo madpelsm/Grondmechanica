@@ -1,11 +1,17 @@
-#include <nanogui/Grond.h>
+#include <Grond.h>
 
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam):
-    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens),ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid),Naam(_Naam) {
+    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens),
+    ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid),Naam(_Naam) {
     laagdikte = std::abs(bovengrens - ondergrens);
     std::ostringstream str;
     
-    str<<"Grondlaag "<<Naam<<" met samendrukkingscoefficient C= " << std::setprecision(decimalPrecisionInShout)<<samendrukkingsCoeff << " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout)<<(bovengrens) << "m tot " << std::setprecision(decimalPrecisionInShout)<<(ondergrens) << "m \n De massadichtheid van de grond bedraagt: " << std::setprecision(decimalPrecisionInShout)<<(drogeMassDichtheid) << "kN/m^3";
+    str<<"Grondlaag "<<Naam<<" met samendrukkingscoefficient C= " <<
+        std::setprecision(decimalPrecisionInShout)<<samendrukkingsCoeff << 
+        " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout)<<(bovengrens)
+        << "m tot " << std::setprecision(decimalPrecisionInShout)<<(ondergrens) << 
+        "m \n De massadichtheid van de grond bedraagt: " << std::setprecision(decimalPrecisionInShout)
+        <<(drogeMassDichtheid) << "kN/m^3";
     Message = str.str();
 }
 
@@ -34,7 +40,9 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType,float _xPo
     yPositie = _yPos;
     std::ostringstream str; 
     
-    str<<"\nzettingsberekining in punt (" << std::setprecision(decimalPrecisionInShout)<<xPositie << "," << std::setprecision(decimalPrecisionInShout)<<yPositie<< ")\n" << belastingsType.shout()<<"\n";
+    str<<"\nzettingsberekining in punt (" << std::setprecision(decimalPrecisionInShout)
+        <<xPositie << "," << std::setprecision(decimalPrecisionInShout)<<yPositie<< ")\n" 
+        << belastingsType.shout()<<"\n";
     message = str.str();
 
 }
@@ -44,7 +52,8 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType, float _xP
     belastingsType = _belastingsType;
     xPositie = _xPos;
     yPositie = 0;
-    message = "\nzettingsberekining in punt (" + std::to_string(xPositie) + "," + std::to_string(yPositie) + ")\n";
+    message = "\nzettingsberekining in punt (" + std::to_string(xPositie) + "," +
+        std::to_string(yPositie) + ")\n";
 
 }
 
@@ -57,11 +66,13 @@ void Zettingsberekening::addGrondlaag(Grond g)
 void Zettingsberekening::berekenZetting()
 {
     dZetting.clear();
-    std::vector<double> zettingPerLaag;
+    dSigma_eff.clear();
+    dDelta_sigma.clear();
     double effectieveSpanningOpZ = 0;
     double diepte = 0;
     double previousDiepte = 0;
     double totZetting = 0;
+    double dDelt_sigma = 0;
     double finaleSpanningOpZ = 0, HOverC=0, lnGedeelte=0, zettingT=0;
     for (int i = 0; i < grondlagen.size(); i++) {
         double j = 0;
@@ -69,21 +80,22 @@ void Zettingsberekening::berekenZetting()
              j = j + gridSize;
              diepte = previousDiepte+j;
              effectieveSpanningOpZ=grondlagen[i].drogeMassDichtheid*diepte;
-             finaleSpanningOpZ = effectieveSpanningOpZ + belastingsType.deltaSig(diepte,xPositie);
+             dDelt_sigma = belastingsType.deltaSig(diepte, xPositie);
+             finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
              HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
              lnGedeelte = std::log( (finaleSpanningOpZ) / (double)effectieveSpanningOpZ);
              zettingT = (double)(HOverC*lnGedeelte);
-
+             //stockeer waarden voor latere preview
              dZetting.push_back(zettingT);
-
-             zettingPerLaag.push_back(zettingT);
+             dDelta_sigma.push_back(dDelt_sigma);
+             dSigma_eff.push_back(effectieveSpanningOpZ);
         }
         previousDiepte += grondlagen[i].laagdikte;
         
     }
     double tot = 0;
-    for (int k = 0; k < zettingPerLaag.size(); k++) {
-        tot += (double)zettingPerLaag[k];
+    for (int k = 0; k < dZetting.size(); k++) {
+        tot += (double)dZetting[k];
     }
     totalePrimaireZetting = tot;
 }
@@ -107,8 +119,37 @@ std::string Zettingsberekening::shout()
 
 void Zettingsberekening::setGridSize(float _gridSize)
 {
-    //default is 0.1m
     gridSize = _gridSize;
+}
+
+float Zettingsberekening::getOpDiepte(float diepte, std::vector<double> &DiepteInfo)
+{
+    float zettingOpDiepte = 0.0f;
+    if (!DiepteInfo.empty()) {
+        float n =(int)( (diepte / (float)gridSize));
+        if (n >= 0 && n < DiepteInfo.size()) {
+            zettingOpDiepte = DiepteInfo[(int)n];
+        }
+    }
+    else {
+        std::cout << "diepte info was empty" << std::endl;
+    }
+    return zettingOpDiepte;
+}
+
+float Zettingsberekening::getZettingOpDiepte(float diepte)
+{
+    return getOpDiepte(diepte, dZetting);
+}
+
+float Zettingsberekening::getEffectieveOpDiepte(float diepte)
+{
+    return getOpDiepte(diepte, dSigma_eff);
+}
+
+float Zettingsberekening::getDSigmaOpDiepte(float diepte)
+{
+    return getOpDiepte(diepte, dDelta_sigma);
 }
 
 float Zettingsberekening::getGridSize()
@@ -146,7 +187,8 @@ float BelastingsType::deltaSig(float z,float xPositie)
         //deel loodrecht onder berlasting
         if (xPositie<=x2 && x1<=xPositie) {
             //in de formule wordt beta dan nul
-            double alpha = std::atan(std::abs(xPositie - x1) / (double)z) + std::atan(std::abs(x2 - xPositie) / (double)z);
+            double alpha = std::atan(std::abs(xPositie - x1) / (double)z) + 
+                std::atan(std::abs(x2 - xPositie) / (double)z);
             delta_sigma = (qs / pi)*(alpha + sin(alpha)*cos(alpha));
         }
         else if (xPositie<x1){
@@ -170,6 +212,9 @@ std::string BelastingsType::shout()
 {
     std::ostringstream out;
     
-    out << "Belasting: " << std::setprecision(decimalPrecisionInShout)<<x1 << "m tot " << std::setprecision(decimalPrecisionInShout)<< x2 << "m, \ngrootte "<< std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^3 \nType " << typeNaam << std::endl;
+    out << "Belasting: " << std::setprecision(decimalPrecisionInShout)<<x1 << 
+        "m tot " << std::setprecision(decimalPrecisionInShout)<< x2 << "m, \ngrootte "
+        << std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^3 \nType " << 
+        typeNaam << std::endl;
     return out.str();
 }

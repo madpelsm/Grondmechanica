@@ -38,7 +38,7 @@ class Zettingsberekening {
     std::string message;
     int decimalPrecisionInShout = 2;
 public:
-    std::vector<double>dZetting;
+    std::vector<double>dZetting,dDelta_sigma,dSigma_eff;
     BelastingsType belastingsType;//bepaal adhv dit de formule voor de belasting
     double fea;
     float  xPositie, yPositie;
@@ -53,5 +53,9 @@ public:
     double getTotaleZetting();
     std::string shout();
     void setGridSize(float _gridSize);
+    float getOpDiepte(float diepte, std::vector<double>& DiepteInfo);//bevat een vector de info van een param op verschillende dieptes
+    float getZettingOpDiepte(float diepte);
+    float getEffectieveOpDiepte(float diepte);
+    float getDSigmaOpDiepte(float diepte);
     float getGridSize();
 };
