@@ -139,7 +139,8 @@ float Zettingsberekening::getOpDiepte(float diepte, std::vector<double> &DiepteI
 
 float Zettingsberekening::getZettingOpDiepte(float diepte)
 {
-    return getOpDiepte(diepte, dZetting);
+   
+    return getOpDiepte(diepte,dZetting);
 }
 
 float Zettingsberekening::getEffectieveOpDiepte(float diepte)

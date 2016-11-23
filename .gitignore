@@ -6,7 +6,7 @@ Release
 Release/
 Grondmechanica.vcxproj
 Grondmechanica.vcxproj.filters
-
+Grondmechanica.vcxproj.user
 # Windows image file caches
 Thumbs.db
 ehthumbs.db

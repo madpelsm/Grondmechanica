@@ -191,8 +191,8 @@ int main(int argc, char * argv[]) {
                 str << "zetting in punt (" << 
                     std::setprecision(pointPrecisionInDialog) << sonderingsPunt[i].xPositie << 
                     "," << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[i].yPositie 
-                    << ") : " << std::to_string(sonderingsPunt[i].getTotaleZetting()) + "m.\nCalculated width grid size: " 
-                    << sonderingsPunt[i].getGridSize() << "m";
+                    << ") : " << std::to_string(sonderingsPunt[i].getTotaleZetting()) + "m.\nBerekend met maaswijdte: " 
+                    << sonderingsPunt[i].getGridSize() << "m\n";
             }
             func.resize(sonderingsPunt[0].grondlagen.size());
             for (int i = 0; i < sonderingsPunt[0].grondlagen.size(); i++) {
@@ -227,7 +227,7 @@ int main(int argc, char * argv[]) {
             str << "\nzetting in punt (" << std::setprecision(pointPrecisionInDialog) << 
                 sonderingsPunt[i].xPositie << "," << std::setprecision(pointPrecisionInDialog) << 
                 sonderingsPunt[i].yPositie << ") : " << std::to_string(sonderingsPunt[i].getTotaleZetting()) 
-                + "mm.\nCalculated width grid size: " << sonderingsPunt[i].getGridSize();
+                + "mm.\nBerekend met maaswijdte: " << sonderingsPunt[i].getGridSize()<<"m\n********************************\n";
 
         }
         writeToFile(str.str());
@@ -248,7 +248,27 @@ int main(int argc, char * argv[]) {
             MessageDialog* m2 = new MessageDialog(screen, MessageDialog::Type::Information, message.str(), str.str(), "OK", "Cancel", false);
         }
     });
+/*
+    // tabs
+    Window * window = new Window(screen, "titel");
+    window->setLayout(new GroupLayout());
+    window->setPosition(Vector2i(425, 15));
+    window->setSize(Eigen::Vector2i(300, 500));
 
+
+    TabWidget* tabWidget = window->add<TabWidget>();
+    Widget* layer = tabWidget->createTab("Color WheelTAV");
+
+    layer->setLayout(new GroupLayout());
+    layer->add<Label>("Color wheel widget", "sans-bold");
+    layer->add<ColorWheel>();
+
+    Widget *layer2 = tabWidget->createTab("function graph");
+
+    layer2->setLayout(new GroupLayout());
+    layer2->add<Label>("Function graph widget", "sans-bold");
+    graph->setParent(layer2);
+     */
     screen->setVisible(true);
     window3->setParent(screen);
     screen->performLayout();
