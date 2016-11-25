@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <algorithm>
 class Grond {
-    int decimalPrecisionInShout = 2;
+    int decimalPrecisionInShout = 3;
 public:
     double samendrukkingsCoeff, bovengrens, ondergrens, laagdikte, drogeMassDichtheid;
     std::string Naam;
@@ -20,10 +20,10 @@ public:
 class BelastingsType {
     bool initialised = false;
     std::string typeNaam;
-    int decimalPrecisionInShout = 2;
+    int decimalPrecisionInShout = 3;
 public:
     float sigma_fin, sigmaZ_0;
-    float belastingsBreedte, qs, pi = 3.14159265359, x1, x2;
+    float belastingsBreedte, qs, pi = 4*atan(1), x1, x2;
     int type = 0;//type 0 : uniforme strip
 
     BelastingsType();
@@ -37,9 +37,9 @@ class Zettingsberekening {
     float gridSize = 0.1/*gridgrootte in meter*/;
     double totalePrimaireZetting=0;
     std::string message;
-    int decimalPrecisionInShout = 2;
+    int decimalPrecisionInShout = 3;
 public:
-    std::vector<double>dZetting,dDelta_sigma,dSigma_eff;
+    std::vector<double>dZetting,dDelta_sigma,dSigma_eff,graphDzetting;
     BelastingsType belastingsType;//bepaal adhv dit de formule voor de belasting
     double fea;
     float  xPositie, yPositie;

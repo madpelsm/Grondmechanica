@@ -26,12 +26,12 @@ enum InfoOpDiepteTypes {
 //variable declarations
 
 float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
-int windowMargin = 8;
+int windowMargin = 2;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte,
 beginPosLast, eindPosLast, lastGrootte;
 int belastingID = 0;//de locatie van de belasting in de vector met belastingstypes
-int WIDTH = 800, HEIGHT = 600, pointPrecisionInDialog = 3;
+int WIDTH = 1000, HEIGHT = 600, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort";
 InfoOpDiepteTypes diepteInfoType = Zetting;
 test_enum loadType = UniformStripLoad;
@@ -54,8 +54,8 @@ std::vector<std::string> split(const std::string &s, char delim);
 
 int main(int argc, char * argv[]) {
     nanogui::init();
-    Screen *screen = new Screen(Vector2i(WIDTH, HEIGHT), "Zettingsberekening");
-
+    Screen *screen = new Screen(Vector2i(WIDTH, HEIGHT), "Zettingsberekening",true,false,8,8,24,8,2);
+    
 
     bool enabled = true;
 
@@ -72,6 +72,7 @@ int main(int argc, char * argv[]) {
 
     FormHelper *zettingsGUI = new FormHelper(screen);
     ref<Window> window4 = zettingsGUI->addWindow(Eigen::Vector2i(windowMargin, HEIGHT / 5 * 2), "Zettingen");
+
 
     sonderingGUI->addGroup("Locatie")->setTooltip("Plaats waar we de zetting zullen berekenen.");
     sonderingGUI->addVariable("Zettingspunt", sonderingsnummer)->setTooltip(
@@ -113,73 +114,97 @@ int main(int argc, char * argv[]) {
     belastingGUI->addButton("Maak last aan", [&screen]() {
         genereerLast(beginPosLast, eindPosLast, lastGrootte, loadType, screen);
     })->setTooltip("Klik om de last aan te maken");
-    int wW = 200, wH = 300;
+    int wW = 400, wH = 200;
+
     Window *w = new Window(screen, "Graph");
-    w->setPosition(Eigen::Vector2i(2 * WIDTH / 6, 3 * HEIGHT / 7));
-    w->setWidth(wW);
-    w->setHeight(wH);
+    w->setPosition(Eigen::Vector2i(2 * WIDTH / 6, 2.5 * HEIGHT / 7));
+    w->setFixedWidth(wW);
     w->setVisible(true);
-    Graph *graph = new Graph(w, "Zettingsverloop");
+
+
+    TabWidget * graphTabs = new TabWidget(w);
+    Widget * zettingGraphWidg = graphTabs->createTab("Zetting");
+    Graph *graph = new Graph(zettingGraphWidg, "Zettingsverloop");
     graph->setFooter("diepte");
     VectorXf &func = graph->values();
-    graph->setPosition(Eigen::Vector2i(0, 30));
-    graph->setFixedSize(Eigen::Vector2i(wW, wH - 60));
+    graph->setFixedHeight(wH);
     graph->setTooltip("Zettingsverloop");
     graph->setForegroundColor(grond_kleur_graph);
+
+
+
+    Widget * sigma_eff_widg = graphTabs->createTab("sigma_eff");
+    Graph * sigma_eff_graph = sigma_eff_widg->add<Graph>("sigma_eff");
+    sigma_eff_graph->setFixedHeight(wH);
+    sigma_eff_graph->setTooltip("Zettingsverloop");
+    sigma_eff_graph->setForegroundColor(grond_kleur_graph);
+    sigma_eff_graph->setFooter("diepte");
+    VectorXf &sigma_eff_val = sigma_eff_graph->values();
+
+    Widget * dSigm_widg = graphTabs->createTab("deltaSigma");
+    Graph * dSigm_graph = dSigm_widg->add<Graph>("deltaSigma");
+    dSigm_graph->setFixedHeight(wH);
+    dSigm_graph->setTooltip("Zettingsverloop");
+    dSigm_graph->setForegroundColor(grond_kleur_graph);
+    dSigm_graph->setFooter("diepte");
+    VectorXf &dSigm_val = dSigm_graph->values();
+
+    Widget * dZettingWidg = graphTabs->createTab("Afgeleide zetting");
+    Graph * dZetting_graph = dZettingWidg->add<Graph>("Afgeleide zetting");
+    dZetting_graph->setFixedHeight(wH);
+    dZetting_graph->setTooltip("Zettingsverloop");
+    dZetting_graph->setForegroundColor(grond_kleur_graph);
+    dZetting_graph->setFooter("diepte");
+    VectorXf &dZetting_val = dZetting_graph->values();
+
+    graphTabs->setLayout(new GridLayout(Orientation::Horizontal, 1, Alignment::Middle, 0, 0));
+
+    zettingGraphWidg->setLayout(new GridLayout(Orientation::Vertical, 1, Alignment::Fill, 0, 0));
+    dSigm_widg->setLayout(new GridLayout(Orientation::Vertical, 1, Alignment::Fill, 0, 0));
+    sigma_eff_widg->setLayout(new GridLayout(Orientation::Vertical, 1, Alignment::Fill, 0, 0));
+    dZettingWidg->setLayout(new GridLayout(Orientation::Vertical, 1, Alignment::Fill, 0, 0));
+    
     PopupButton *popupBtn;
-
     popupBtn = new PopupButton(w, "", 0);
-
     popupBtn->setBackgroundColor(grond_kleur_graph);
-
     popupBtn->setFontSize(16);
     popupBtn->setFixedSize(Vector2i(70, 30));
     popupBtn->setPosition(Eigen::Vector2i((wW - 70) / 2.0, wH - 30));
     Popup * popup = popupBtn->popup();
     popup = popupBtn->popup();
-
     popup->setLayout(new GroupLayout());
-
-
-
     ColorWheel *colorwheel = new ColorWheel(popup);
-
     colorwheel->setColor(popupBtn->backgroundColor());
-
     Button *colorBtn = new Button(popup, "Kies");
-
     colorBtn->setFixedSize(Vector2i(100, 25));
-
     Color c = colorwheel->color();
-
     colorBtn->setBackgroundColor(c);
-
-
-
     colorwheel->setCallback([colorBtn](const Color &value) {
 
         colorBtn->setBackgroundColor(value);
 
     });
-    colorBtn->setChangeCallback([colorBtn, popupBtn, &graph](bool pushed) {
-
+    colorBtn->setChangeCallback([colorBtn, popupBtn, &graph,&sigma_eff_graph,&dSigm_graph,&dZetting_graph](bool pushed) {
         if (pushed) {
-
             popupBtn->setBackgroundColor(colorBtn->backgroundColor());
-
             popupBtn->setPushed(false);
-
             graph->setForegroundColor(
                 popupBtn->backgroundColor());
-
+            sigma_eff_graph->setForegroundColor(
+                popupBtn->backgroundColor());
+            dSigm_graph->setForegroundColor(
+                popupBtn->backgroundColor());
+            dZetting_graph->setForegroundColor(
+                popupBtn->backgroundColor());
         }
-
     });
 
+    w->setLayout(new GridLayout(Orientation::Horizontal, 1, Alignment::Fill, 0, 0));
+    graphTabs->setActiveTab(0);
 
     zettingsGUI->addVariable("Maasbreedte [m]", gridSize)->setTooltip(
             "Kies de nauwkeurigheid waarmee gerekend moet worden, kleinere waarden zorgen wel voor een langere rekentijd.");
-    zettingsGUI->addButton("Calculate", [&screen, &func, &graph]() {
+    zettingsGUI->addButton("Calculate", [&screen, &func, &graph,&sigma_eff_val,&dSigm_val,&dZetting_val]() {
         std::ostringstream str;
         sonderingsPunt.size();
         str << "Onvolledige invoer :(";
@@ -194,10 +219,15 @@ int main(int argc, char * argv[]) {
                     << ") : " << std::to_string(sonderingsPunt[i].getTotaleZetting()) + "m.\nBerekend met maaswijdte: " 
                     << sonderingsPunt[i].getGridSize() << "m\n";
             }
-            func.resize(sonderingsPunt[0].grondlagen.size());
-            for (int i = 0; i < sonderingsPunt[0].grondlagen.size(); i++) {
-                if (i < 0) std::cout << "negative iterator" << std::endl;
-                func[i] = graphScale*sonderingsPunt[0].dZetting[i]/sonderingsPunt[0].dZetting[0];
+            func.resize(sonderingsPunt[0].dZetting.size());
+            sigma_eff_val.resize(sonderingsPunt[0].dZetting.size());
+            dSigm_val.resize(sonderingsPunt[0].dZetting.size());
+            dZetting_val.resize(sonderingsPunt[0].dZetting.size());
+            for (int i = 0; i < sonderingsPunt[0].dZetting.size(); i++) {
+                dZetting_val[i] = graphScale*sonderingsPunt[0].dZetting[i] / sonderingsPunt[0].dZetting[0];
+                dSigm_val[i] = graphScale*sonderingsPunt[0].dDelta_sigma[i] / sonderingsPunt[0].dDelta_sigma[0];
+                sigma_eff_val[i]= graphScale*sonderingsPunt[0].dSigma_eff[i]/ sonderingsPunt[0].dSigma_eff.back();
+                func[i] = graphScale*sonderingsPunt[0].graphDzetting[i]/sonderingsPunt[0].graphDzetting[0];
             }
 
         }
@@ -218,8 +248,8 @@ int main(int argc, char * argv[]) {
         for (int i = 0; i < sonderingsPunt.size(); i++) {
             infoOfLoaded += sonderingsPunt[i].shout();
         }
-        MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Information, "huidige configuratie", infoOfLoaded, "OK");
 
+        MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Information, "huidige configuratie", infoOfLoaded, "OK");
         })->setTooltip("Beschrijving van de grondlagen.");
     zettingsGUI->addButton("Export", []() {
         std::ostringstream str;
@@ -249,27 +279,10 @@ int main(int argc, char * argv[]) {
             MessageDialog* m2 = new MessageDialog(screen, MessageDialog::Type::Information, message.str(), str.str(), "OK", "Cancel", false);
         }
     });
-/*
-    // tabs
-    Window * window = new Window(screen, "titel");
-    window->setLayout(new GroupLayout());
-    window->setPosition(Vector2i(425, 15));
-    window->setSize(Eigen::Vector2i(300, 500));
 
 
-    TabWidget* tabWidget = window->add<TabWidget>();
-    Widget* layer = tabWidget->createTab("Color WheelTAV");
 
-    layer->setLayout(new GroupLayout());
-    layer->add<Label>("Color wheel widget", "sans-bold");
-    layer->add<ColorWheel>();
-
-    Widget *layer2 = tabWidget->createTab("function graph");
-
-    layer2->setLayout(new GroupLayout());
-    layer2->add<Label>("Function graph widget", "sans-bold");
-    graph->setParent(layer2);
-     */
+    screen->setLayout(new GridLayout(Orientation::Vertical, 2, Alignment::Middle, windowMargin, 0));
     screen->setVisible(true);
     window3->setParent(screen);
     screen->performLayout();
