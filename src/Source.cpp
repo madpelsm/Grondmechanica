@@ -196,6 +196,7 @@ int main(int argc, char * argv[]) {
             }
             func.resize(sonderingsPunt[0].grondlagen.size());
             for (int i = 0; i < sonderingsPunt[0].grondlagen.size(); i++) {
+                if (i < 0) std::cout << "negative iterator" << std::endl;
                 func[i] = graphScale*sonderingsPunt[0].dZetting[i]/sonderingsPunt[0].dZetting[0];
             }
 

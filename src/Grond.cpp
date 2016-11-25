@@ -1,9 +1,13 @@
 #include <Grond.h>
 
+
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam):
-    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens),
-    ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid),Naam(_Naam) {
+    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens), Naam(_Naam),
+    ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid){
+    std::replace(Naam.begin(), Naam.end(), ' ', '_');
     laagdikte = std::abs(bovengrens - ondergrens);
+
+
     std::ostringstream str;
     
     str<<"Grondlaag "<<Naam<<" met samendrukkingscoefficient C= " <<
@@ -213,9 +217,9 @@ std::string BelastingsType::shout()
 {
     std::ostringstream out;
     
-    out << "Belasting: " << std::setprecision(decimalPrecisionInShout)<<x1 << 
+    out << "Belasting:\n " << std::setprecision(decimalPrecisionInShout)<<x1 << 
         "m tot " << std::setprecision(decimalPrecisionInShout)<< x2 << "m, \ngrootte "
-        << std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^3 \nType " << 
+        << std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^2 \nType " << 
         typeNaam << std::endl;
     return out.str();
 }

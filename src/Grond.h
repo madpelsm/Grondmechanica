@@ -4,6 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 class Grond {
     int decimalPrecisionInShout = 2;
 public:
