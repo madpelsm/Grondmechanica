@@ -4,19 +4,47 @@
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam):
     samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens), Naam(_Naam),
     ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid){
-    std::replace(Naam.begin(), Naam.end(), ' ', '_');
+
     laagdikte = std::abs(bovengrens - ondergrens);
+    gen_js();
+    gen_msg();
+}
 
+Grond::Grond(json grondJS){
 
+    samendrukkingsCoeff = grondJS["samendrukkingsCoeff"].get<double>();
+    ondergrens = grondJS["ondergrens"].get<double>();
+    bovengrens = grondJS["bovengrens"].get<double>();
+    drogeMassDichtheid = grondJS["drogeMassaDichtheid"].get<double>();
+    Naam = grondJS["Naam"].get<std::string>();
+
+    laagdikte = std::abs(bovengrens - ondergrens);
+    ground_js = grondJS;
+    gen_msg();
+}
+
+void Grond::gen_msg() {
     std::ostringstream str;
-    
-    str<<"Grondlaag "<<Naam<<" met samendrukkingscoefficient C= " <<
-        std::setprecision(decimalPrecisionInShout)<<samendrukkingsCoeff << 
-        " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout)<<(bovengrens)
-        << "m tot " << std::setprecision(decimalPrecisionInShout)<<(ondergrens) << 
+
+    str << "Grondlaag " << Naam << " met samendrukkingscoefficient C= " <<
+        std::setprecision(decimalPrecisionInShout) << samendrukkingsCoeff <<
+        " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout) << (bovengrens)
+        << "m tot " << std::setprecision(decimalPrecisionInShout) << (ondergrens) <<
         "m \n De massadichtheid van de grond bedraagt: " << std::setprecision(decimalPrecisionInShout)
-        <<(drogeMassDichtheid) << "kN/m^3";
+        << (drogeMassDichtheid) << "kN/m^3";
     Message = str.str();
+    str.clear();
+}
+
+
+void Grond::gen_js() {
+    json js;
+    js["samendrukkingsCoeff"] = samendrukkingsCoeff;
+    js["ondergrens"] = ondergrens;
+    js["bovengrens"] = bovengrens;
+    js["drogeMassaDichtheid"] = drogeMassDichtheid;
+    js["Naam"] = Naam;
+    ground_js = js;
 }
 
 Grond::~Grond()
@@ -36,18 +64,41 @@ Zettingsberekening::Zettingsberekening()
 {
 }
 
+Zettingsberekening::Zettingsberekening(json js){
+
+    belastingsType = BelastingsType(js["belasting"]);
+
+    std::vector<json> grondlagenJS = js["grondlagen"].get<std::vector<json>>();
+    for (unsigned int i = 0; i < grondlagenJS.size(); i++) {
+        grondlagen.push_back(Grond(grondlagenJS[i]));
+    }
+    xPositie = js["x"].get<double>();
+    yPositie = js["y"].get<double>();
+    zettingsBerekeningJS = js;
+    gen_msg();
+}
+
 
 Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType,float _xPos,float _yPos)
 {
     belastingsType = _belastingsType;
     xPositie = _xPos;
     yPositie = _yPos;
-    std::ostringstream str; 
-    
-    str<<"\nzettingsberekining in punt (" << std::setprecision(decimalPrecisionInShout)
-        <<xPositie << "," << std::setprecision(decimalPrecisionInShout)<<yPositie<< ")\n" 
-        << belastingsType.shout()<<"\n";
-    message = str.str();
+    gen_js();
+    gen_msg();
+}
+
+void Zettingsberekening::gen_js(){
+    json js;
+    js["belasting"] = belastingsType.belastingsTypeJS;
+    std::vector<json> grondlagen_js;
+    for (unsigned int i = 0; i < grondlagen.size(); i++) {
+        grondlagen_js.push_back(grondlagen[i].ground_js);
+    }
+    js["grondlagen"] = grondlagen_js;
+    js["x"] = xPositie;
+    js["y"] = yPositie;
+    zettingsBerekeningJS = js;
 
 }
 
@@ -56,9 +107,22 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType, float _xP
     belastingsType = _belastingsType;
     xPositie = _xPos;
     yPositie = 0;
-    message = "\nzettingsberekining in punt (" + std::to_string(xPositie) + "," +
-        std::to_string(yPositie) + ")\n";
+    gen_msg();
 
+}
+
+void Zettingsberekening::gen_msg()
+{
+    std::ostringstream str;
+    std::cout << "gen_msg grond";
+    str << "\nzettingsberekining in punt (" << std::setprecision(decimalPrecisionInShout)
+        << xPositie << "," << std::setprecision(decimalPrecisionInShout) << yPositie << ")\n"
+        << belastingsType.shout() << "\n";
+    for (int i = 0; i < grondlagen.size(); i++) {
+        str << grondlagen[i].shout() << "\n";
+    }
+    message = str.str();
+    str.clear();
 }
 
 void Zettingsberekening::addGrondlaag(Grond g)
@@ -72,6 +136,7 @@ void Zettingsberekening::berekenZetting()
     dZetting.clear();
     dSigma_eff.clear();
     dDelta_sigma.clear();
+    graphDzetting.clear();
     double effectieveSpanningOpZ = 0;
     double diepte = 0;
     double totZetting = 0;
@@ -166,6 +231,20 @@ BelastingsType::BelastingsType()
     
 }
 
+BelastingsType::BelastingsType(json js){
+    x1 = js["x1"].get<double>();
+    x2 = js["x2"].get<double>();
+    qs = js["qs"].get<double>();
+    type = js["type"].get<int>();
+    if (type == 0) {
+        typeNaam = "Uniforme Stripbelasting";
+    }
+
+    belastingsBreedte = std::abs(x2 - x1);
+    initialised = true;
+    belastingsTypeJS = js;
+}
+
 BelastingsType::BelastingsType(float _x1,float _x2, float _qs, int _typeLast) :
     x1(_x1),x2(_x2)
     , qs(_qs), type(_typeLast)
@@ -180,6 +259,8 @@ BelastingsType::BelastingsType(float _x1,float _x2, float _qs, int _typeLast) :
     
     belastingsBreedte = std::abs(x2 - x1);
     initialised = true;
+    gen_js();
+
 }
 
 float BelastingsType::deltaSig(float z,float xPositie)
@@ -193,6 +274,15 @@ float BelastingsType::deltaSig(float z,float xPositie)
         delta_sigma = (qs / pi)*(alpha + sin(alpha)*cos(alpha+2*beta));
     }
     return delta_sigma;
+}
+
+void BelastingsType::gen_js(){
+    json js;
+    js["x1"] = x1;
+    js["x2"] = x2;
+    js["qs"] = qs;
+    js["type"] = type;
+    belastingsTypeJS = js;
 }
 
 std::string BelastingsType::shout()

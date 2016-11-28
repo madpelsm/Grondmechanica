@@ -6,6 +6,9 @@
 #include <fstream>
 #include <sys/stat.h>
 #include <regex>
+#include <thread>
+#include <stdio.h>
+#include <ctime>
 
 using namespace nanogui;
 
@@ -27,6 +30,7 @@ enum InfoOpDiepteTypes {
 
 float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
 int windowMargin = 2;
+bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte,
 beginPosLast, eindPosLast, lastGrootte;
@@ -48,7 +52,7 @@ void genereerLast(double beginPosLast, double eindPosLast, double
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos, 
         double feaHoogte, test_enum enumval, Screen * screen);
 std::string writeToFile(std::string _content);
-std::string makeSaveFile(std::vector<Zettingsberekening> e);
+std::string makeSaveFile(std::vector<Zettingsberekening> &e);
 void readFromFile();
 std::vector<std::string> split(const std::string &s, char delim);
 
@@ -77,7 +81,7 @@ int main(int argc, char * argv[]) {
     sonderingGUI->addGroup("Locatie")->setTooltip("Plaats waar we de zetting zullen berekenen.");
     sonderingGUI->addVariable("Zettingspunt", sonderingsnummer)->setTooltip(
             "Dit is het punt waar we de zetting in zullen berekenen, dit kan op de plaats van een sondering of een boring zijn.");
-    sonderingGUI->addVariable("X positie [m]", xPos);
+    sonderingGUI->addVariable("X positie [m]", xPos)->setTooltip("De plaats in de richting van de breedte van de last");
     sonderingGUI->addVariable("Y Positie [m]", yPos);
     sonderingGUI->addVariable("Freatisch oppervlakhoogte [m]", feaHoogte)->setTooltip(
             "Indien dit gekend is, dit is niet noodzakelijk");
@@ -210,15 +214,36 @@ int main(int argc, char * argv[]) {
         str << "Onvolledige invoer :(";
         if (!sonderingsPunt.empty()) {
             str = std::ostringstream();
+            //multi threaded calculation
+            std::clock_t timer;
+            timer = std::clock();
+            double dur;
+            if (multithreaded) {
+
+                std::vector<std::thread> calculationThread;
+                for (int i = 0; i < sonderingsPunt.size(); i++) {
+                    sonderingsPunt[i].setGridSize(gridSize);
+                    calculationThread.push_back(std::thread(&Zettingsberekening::berekenZetting, &sonderingsPunt[i]));
+                }
+                for (int i = 0; i < calculationThread.size(); i++) {
+                    calculationThread[i].join();
+                }
+                calculationThread.clear();
+            }
             for (int i = 0; i < sonderingsPunt.size(); i++) {
-                sonderingsPunt[i].setGridSize(gridSize);
-                sonderingsPunt[i].berekenZetting();
+                if (!multithreaded) {
+                    sonderingsPunt[i].setGridSize(gridSize);
+                    sonderingsPunt[i].berekenZetting();
+                }
                 str << "zetting in punt (" << 
                     std::setprecision(pointPrecisionInDialog) << sonderingsPunt[i].xPositie << 
                     "," << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[i].yPositie 
                     << ") : " << std::to_string(sonderingsPunt[i].getTotaleZetting()) + "m.\nBerekend met maaswijdte: " 
-                    << sonderingsPunt[i].getGridSize() << "m\n";
+                    << sonderingsPunt[i].getGridSize() << "m\n\n";
             }
+
+            dur = (std::clock() - timer) / ((double)CLOCKS_PER_SEC);
+            str << "Berekend in " << dur << "s\n" << std::endl;
             func.resize(sonderingsPunt[0].dZetting.size());
             sigma_eff_val.resize(sonderingsPunt[0].dZetting.size());
             dSigm_val.resize(sonderingsPunt[0].dZetting.size());
@@ -229,6 +254,7 @@ int main(int argc, char * argv[]) {
                 sigma_eff_val[i]= graphScale*sonderingsPunt[0].dSigma_eff[i]/ sonderingsPunt[0].dSigma_eff.back();
                 func[i] = graphScale*sonderingsPunt[0].graphDzetting[i]/sonderingsPunt[0].graphDzetting[0];
             }
+            str.clear();
 
         }
         MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Information, "De zettingen", 
@@ -251,6 +277,7 @@ int main(int argc, char * argv[]) {
 
         MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Information, "huidige configuratie", infoOfLoaded, "OK");
         })->setTooltip("Beschrijving van de grondlagen.");
+
     zettingsGUI->addButton("Export", []() {
         std::ostringstream str;
         for (int i = 0; i < sonderingsPunt.size(); i++) {
@@ -264,7 +291,6 @@ int main(int argc, char * argv[]) {
         writeToFile(str.str());
     });
 
-    //zettingsGUI->addVariable("Kies het infotype", infoOpDiepte, true)->setItems({"De zetting","Effectieve spanning","Spanningsverschil"});
     zettingsGUI->addVariable("Diepte", infoDiepte);
     zettingsGUI->addButton("Geef info op diepte", [&screen]() {
 
@@ -363,83 +389,34 @@ std::string writeToFile(std::string fileContent) {
     return "write failed";
 }
 
-std::string makeSaveFile(std::vector<Zettingsberekening> e) {
-    std::string t;
+std::string makeSaveFile(std::vector<Zettingsberekening> &e) {
+
+    json saveJS;
+    std::vector<json> Zettingspuntenjs;
     for (int i = 0; i < e.size(); i++) {
-        t += "x" + std::to_string(e[i].xPositie) + "y" + std::to_string(e[i].yPositie) + "w" + std::to_string(e[i].fea);
-        t += "b" + std::to_string(e[i].belastingsType.type) + "bxone" + 
-            std::to_string(e[i].belastingsType.x1) + "bxtw" + std::to_string(e[i].belastingsType.x2) + 
-            "bq" + std::to_string(e[i].belastingsType.qs);
-        for (int j = 0; j < e[i].grondlagen.size(); j++) {
-            t += "gyup" + std::to_string(e[i].grondlagen[j].bovengrens) + "gyun" + 
-                std::to_string(e[i].grondlagen[j].ondergrens) + "C" + std::to_string(e[i].grondlagen[j].samendrukkingsCoeff) + 
-                "gm" + std::to_string(e[i].grondlagen[j].drogeMassDichtheid) + "gn" + e[i].grondlagen[j].Naam + "$";
-        }
-        t += ",";
+        e[i].gen_js();
+        Zettingspuntenjs.push_back(e[i].zettingsBerekeningJS);
     }
+    saveJS["zettingsberekingspunten"] = Zettingspuntenjs;
+
+    std::string t = saveJS.dump(4);
     return t;
 }
 
 void readFromFile() {
     std::string fileLocation = file_dialog({ { "SC","Simple Consolidation" } }, false);
     std::string Content;
+    json inputJS;
     if (!fileLocation.empty()) {
         std::ifstream myfile;
         myfile.open(fileLocation);
-        myfile >> Content;
+        myfile >> inputJS;
         myfile.close();
     }
-    //parse to usefull data
-    std::vector<std::string> sonderingsPunten = split(Content, ',');
-    std::vector<Zettingsberekening> importedZettingsPunten;
-    std::vector<BelastingsType> importedBelasting;
-    for (int i = 0; i < sonderingsPunten.size(); i++) {
-
-        std::size_t foundX = sonderingsPunten[i].find("x");
-        std::size_t foundY = sonderingsPunten[i].find("y", 0);
-        std::size_t foundW = sonderingsPunten[i].find("w", 0);
-        std::size_t foundB = sonderingsPunten[i].find("b", 0);
-        std::size_t foundBXONE = sonderingsPunten[i].find("bxone", 0);
-        std::size_t foundBXTW = sonderingsPunten[i].find("bxtw", 0);
-        std::size_t foundBQ = sonderingsPunten[i].find("bq", 0);
-        std::size_t foundGYUP = sonderingsPunten[i].find("gyup", 0);
-
-
-        double x = std::stod(sonderingsPunten[i].substr(foundX + 1, (foundY - foundX) - 1));
-
-        double y = std::stod(sonderingsPunten[i].substr(foundY + 1, (foundW - foundY) - 1));
-        double loaded_fea = std::stod(sonderingsPunten[i].substr(foundW + 1, foundB - foundW - 1));
-        double belastings_type = std::stod(sonderingsPunten[i].substr(foundB + 1, foundBXONE - foundB - 1));
-        double belasting_x1 = std::stod(sonderingsPunten[i].substr(foundBXONE + 5, foundBXTW - foundBXONE - 5));
-        double belasting_x2 = std::stod(sonderingsPunten[i].substr(foundBXTW + 4, foundBQ - foundBXTW - 4));
-        double belasting_qs = std::stod(sonderingsPunten[i].substr(foundBQ + 2, foundGYUP - foundBQ - 2));
-        importedBelasting.push_back(BelastingsType(belasting_x1, belasting_x2, belasting_qs, belastings_type));
-        importedZettingsPunten.push_back(Zettingsberekening(BelastingsType(belasting_x1, belasting_x2, 
-            belasting_qs, belastings_type), x, y));
-
-
-        int lengte = sonderingsPunten[i].size() - foundGYUP;
-        std::vector<std::string> grond_lagen = split(sonderingsPunten[i].substr(foundGYUP, lengte - 1), '$');
-        for (int j = 0; j < grond_lagen.size(); j++) {
-            std::size_t foundGyup = grond_lagen[j].find("gyup", 0);
-            std::size_t foundGYUN = grond_lagen[j].find("gyun", 0);
-            std::size_t foundC = grond_lagen[j].find("C", 0);
-            std::size_t foundGM = grond_lagen[j].find("gm", 0);
-            std::size_t foundGN = grond_lagen[j].find("gn", 0);
-
-            double ground_yUp = std::stod(grond_lagen[j].substr(foundGyup + 4, foundGYUN - foundGyup - 4));
-            double ground_yUnder = std::stod(grond_lagen[j].substr(foundGYUN + 4, foundC - foundGYUN - 4));
-            double C = std::stod(grond_lagen[j].substr(foundC + 1, foundGM - foundC - 1));
-            double dryMass = std::stod(grond_lagen[j].substr(foundGM + 2, foundGN - foundGM - 2));
-            std::string grondNaam = grond_lagen[j].substr(foundGN + 2, grond_lagen[j].size() - foundGN);
-            importedZettingsPunten[i].addGrondlaag(Grond(C, ground_yUp, ground_yUnder, dryMass, grondNaam));
-        }
-    }
-    if (importedZettingsPunten.size() > 0) {
-        sonderingsPunt = importedZettingsPunten;
-    }
-    if (importedBelasting.size() > 0) {
-        belastingstypes = importedBelasting;
+    std::vector<json> inputVectors = inputJS["zettingsberekingspunten"].get<std::vector<json>>();
+    for (int i = 0; i < inputVectors.size(); i++) {
+        sonderingsPunt.push_back(Zettingsberekening(inputVectors[i]));
+        belastingstypes.push_back(sonderingsPunt[i].belastingsType);
     }
 }
 std::vector<std::string> split(const std::string &s, char delim) {
