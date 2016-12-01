@@ -323,8 +323,8 @@ double Zettingsberekening::getDrainageLength(Grond & onder, Grond & huidig, Gron
     if ( (bovenKS >= 100 * huidigKS) && (onderKS >= 100 * huidigKS) ){
         factor /= 2.0;
     }
-    //because of else if exclusive or is a given
-    else if ((onderKS >= 100 * huidigKS)|| (bovenKS >= 100 * huidigKS)) {
+    else if ((onderKS >= 100 * huidigKS) || (bovenKS >= 100 * huidigKS)
+            && ! ((bovenKS >= 100 * huidigKS) && (onderKS >= 100 * huidigKS))  ) {
         factor /= 1.0;
     }
 

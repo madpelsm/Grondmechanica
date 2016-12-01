@@ -306,12 +306,13 @@ int main(int argc, char * argv[]) {
             std::ostringstream message;
             message << "Informatie op diepte " << std::setprecision(pointPrecisionInDialog) << infoDiepte << "m" << std::endl;
             std::ostringstream str;
+            double zettingNaT = sonderingsPunt[sonderingsnummer].getZettingNaT(tijd);
             str << "Effectieve spanning: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getEffectieveOpDiepte(infoDiepte) << "kPa\n" <<
                 "Spanningsverschil: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getDSigmaOpDiepte(infoDiepte) << "kPa\n" <<
                 "Zetting: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getZettingOpDiepte(infoDiepte) << "m\n" << 
-                "na "<<tijd<<"s is reeds: "<<sonderingsPunt[sonderingsnummer].getZettingNaT(tijd)<<"m zetting bereikt"<<std::endl;
-            std::cout << sonderingsPunt[sonderingsnummer].Consolidatiegraad(0.848) << std::endl;
-            std::cout << sonderingsPunt[sonderingsnummer].Consolidatiegraad(0.197) << std::endl;
+                "na "<<tijd<<"s is reeds: "<< zettingNaT <<"m zetting bereikt\n"
+                <<"U="<<(zettingNaT/ sonderingsPunt[sonderingsnummer].getTotaleZetting())<<std::endl;
+           
             MessageDialog* m2 = new MessageDialog(screen, MessageDialog::Type::Information, message.str(), str.str(), "OK", "Cancel", false);
         }
     });
