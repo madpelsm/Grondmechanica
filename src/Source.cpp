@@ -33,9 +33,9 @@ int windowMargin = 2;
 bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte,
-beginPosLast, eindPosLast, lastGrootte;
+beginPosLast, eindPosLast, lastGrootte,c_v=0.0,k_s=0.0,tijd=999999;
 int belastingID = 0;//de locatie van de belasting in de vector met belastingstypes
-int WIDTH = 1000, HEIGHT = 600, pointPrecisionInDialog = 5;
+int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort";
 InfoOpDiepteTypes diepteInfoType = Zetting;
 test_enum loadType = UniformStripLoad;
@@ -46,7 +46,8 @@ std::vector<BelastingsType> belastingstypes;
 //function identifiers
 void addSolidLayerToSondering(double bovengrens, double ondergrens, 
         double samendrukkingsconstante, double drogemassadichtheid, 
-        std::string grondnaam, int sondering, Screen * screen);
+        std::string grondnaam, int sondering, Screen * screen,double c_v,
+        double k_s);
 void genereerLast(double beginPosLast, double eindPosLast, double 
         lastGrootte, test_enum enumval, Screen * screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos, 
@@ -101,12 +102,14 @@ int main(int argc, char * argv[]) {
     grondGUI->addVariable("Samendrukkingsconstante C", samendrukkingsconstante)->setTooltip(
             "Geprefereerd de C uit de laboproeven.");
     grondGUI->addVariable("Droge massadichtheid kN/m^3", drogeMassadichtheid);
+    grondGUI->addVariable("C_v", c_v);
+    grondGUI->addVariable("Doorlatendheidsfactor", k_s);
 
     grondGUI->addGroup("Bevestig");
     grondGUI->addButton("Voeg grondlaag toe", [&screen]() {
         addSolidLayerToSondering(bovengrens, ondergrens,
             samendrukkingsconstante, drogeMassadichtheid,
-            grondnaam, sonderingsnummer, screen);
+            grondnaam, sonderingsnummer, screen,c_v,k_s);
     });
 
     belastingGUI->addGroup("Belasting");
@@ -176,7 +179,8 @@ int main(int argc, char * argv[]) {
     popupBtn->setPosition(Eigen::Vector2i((wW - 70) / 2.0, wH - 30));
     Popup * popup = popupBtn->popup();
     popup = popupBtn->popup();
-    popup->setLayout(new GroupLayout());
+    popup->setLayout(new GridLayout(Orientation::Horizontal, 2, Alignment::Fill, 0, 0));
+
     ColorWheel *colorwheel = new ColorWheel(popup);
     colorwheel->setColor(popupBtn->backgroundColor());
     Button *colorBtn = new Button(popup, "Kies");
@@ -244,12 +248,12 @@ int main(int argc, char * argv[]) {
 
             dur = (std::clock() - timer) / ((double)CLOCKS_PER_SEC);
             str << "Berekend in " << dur << "s\n" << std::endl;
-            func.resize(sonderingsPunt[0].dZetting.size());
-            sigma_eff_val.resize(sonderingsPunt[0].dZetting.size());
-            dSigm_val.resize(sonderingsPunt[0].dZetting.size());
-            dZetting_val.resize(sonderingsPunt[0].dZetting.size());
-            for (int i = 0; i < sonderingsPunt[0].dZetting.size(); i++) {
-                dZetting_val[i] = graphScale*sonderingsPunt[0].dZetting[i] / sonderingsPunt[0].dZetting[0];
+            func.resize(sonderingsPunt[0].dZettingPrim.size());
+            sigma_eff_val.resize(sonderingsPunt[0].dZettingPrim.size());
+            dSigm_val.resize(sonderingsPunt[0].dZettingPrim.size());
+            dZetting_val.resize(sonderingsPunt[0].dZettingPrim.size());
+            for (int i = 0; i < sonderingsPunt[0].dZettingPrim.size(); i++) {
+                dZetting_val[i] = graphScale*sonderingsPunt[0].dZettingPrim[i] / sonderingsPunt[0].dZettingPrim[0];
                 dSigm_val[i] = graphScale*sonderingsPunt[0].dDelta_sigma[i] / sonderingsPunt[0].dDelta_sigma[0];
                 sigma_eff_val[i]= graphScale*sonderingsPunt[0].dSigma_eff[i]/ sonderingsPunt[0].dSigma_eff.back();
                 func[i] = graphScale*sonderingsPunt[0].graphDzetting[i]/sonderingsPunt[0].graphDzetting[0];
@@ -271,8 +275,11 @@ int main(int argc, char * argv[]) {
 
     zettingsGUI->addButton("Toon huidige configuratie", [&screen]() {
         std::string infoOfLoaded = "";
-        for (int i = 0; i < sonderingsPunt.size(); i++) {
+        /*for (int i = 0; i < sonderingsPunt.size(); i++) {
             infoOfLoaded += sonderingsPunt[i].shout();
+        }*/
+        if (sonderingsnummer < sonderingsPunt.size()) {
+            infoOfLoaded += sonderingsPunt[sonderingsnummer].shout();
         }
 
         MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Information, "huidige configuratie", infoOfLoaded, "OK");
@@ -292,6 +299,7 @@ int main(int argc, char * argv[]) {
     });
 
     zettingsGUI->addVariable("Diepte", infoDiepte);
+    zettingsGUI->addVariable("Tijd [s]", tijd);
     zettingsGUI->addButton("Geef info op diepte", [&screen]() {
 
         if (sonderingsnummer < sonderingsPunt.size()) {
@@ -300,8 +308,10 @@ int main(int argc, char * argv[]) {
             std::ostringstream str;
             str << "Effectieve spanning: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getEffectieveOpDiepte(infoDiepte) << "kPa\n" <<
                 "Spanningsverschil: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getDSigmaOpDiepte(infoDiepte) << "kPa\n" <<
-                "Zetting: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getZettingOpDiepte(infoDiepte) << "m" << std::endl;
-           
+                "Zetting: " << std::setprecision(pointPrecisionInDialog) << sonderingsPunt[sonderingsnummer].getZettingOpDiepte(infoDiepte) << "m\n" << 
+                "na "<<tijd<<"s is reeds: "<<sonderingsPunt[sonderingsnummer].getZettingNaT(tijd)<<"m zetting bereikt"<<std::endl;
+            std::cout << sonderingsPunt[sonderingsnummer].Consolidatiegraad(0.848) << std::endl;
+            std::cout << sonderingsPunt[sonderingsnummer].Consolidatiegraad(0.197) << std::endl;
             MessageDialog* m2 = new MessageDialog(screen, MessageDialog::Type::Information, message.str(), str.str(), "OK", "Cancel", false);
         }
     });
@@ -321,10 +331,10 @@ int main(int argc, char * argv[]) {
 }
 
 void addSolidLayerToSondering(double bovengrens, double ondergrens, double samendrukkingsconstante,
-    double drogemassadichtheid, std::string grondnaam, int sondering, Screen * screen) {
+    double drogemassadichtheid, std::string grondnaam, int sondering, Screen * screen,double c_v,double k_s) {
 
     if ((sondering) < sonderingsPunt.size()) {
-        sonderingsPunt[sondering].addGrondlaag(Grond(samendrukkingsconstante, bovengrens, ondergrens, drogemassadichtheid, grondnaam));
+        sonderingsPunt[sondering].addGrondlaag(Grond(samendrukkingsconstante, bovengrens, ondergrens, drogemassadichtheid, grondnaam,c_v,k_s));
         std::string t = sonderingsPunt[sondering].grondlagen[sonderingsPunt[sondering].grondlagen.size() - 1].shout();
         MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Grondlaag toegevoegd aan zettingsberekingspunt", t, "OK", "Cancel", false);
     }

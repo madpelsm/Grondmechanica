@@ -1,9 +1,9 @@
 #include <Grond.h>
 
 
-Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam):
+Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam,double c_v,double k_s=0.0):
     samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens), Naam(_Naam),
-    ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid){
+    ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid),c_v(c_v){
 
     laagdikte = std::abs(bovengrens - ondergrens);
     gen_js();
@@ -17,9 +17,11 @@ Grond::Grond(json grondJS){
     bovengrens = grondJS["bovengrens"].get<double>();
     drogeMassDichtheid = grondJS["drogeMassaDichtheid"].get<double>();
     Naam = grondJS["Naam"].get<std::string>();
-
+    c_v = (grondJS["C_v"].get<double>()<0.00000001)?0: grondJS["C_v"].get<double>();
+    k_s= (grondJS["k_s"].get<double>()<0.00000001) ? 0 : grondJS["k_s"].get<double>();
     laagdikte = std::abs(bovengrens - ondergrens);
     ground_js = grondJS;
+    //gen_js();
     gen_msg();
 }
 
@@ -31,9 +33,15 @@ void Grond::gen_msg() {
         " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout) << (bovengrens)
         << "m tot " << std::setprecision(decimalPrecisionInShout) << (ondergrens) <<
         "m \n De massadichtheid van de grond bedraagt: " << std::setprecision(decimalPrecisionInShout)
-        << (drogeMassDichtheid) << "kN/m^3";
+        << (drogeMassDichtheid) << "kN/m^3\n" << "met C_v: " << c_v <<
+        "m^2/s\n" << "met doorlatendheid: " << k_s <<"m/s\n";
     Message = str.str();
     str.clear();
+}
+
+double Grond::getLaagDikteNaPrim() {
+    dikteNaPrim = laagdikte - primZetting;
+    return dikteNaPrim;
 }
 
 
@@ -44,6 +52,8 @@ void Grond::gen_js() {
     js["bovengrens"] = bovengrens;
     js["drogeMassaDichtheid"] = drogeMassDichtheid;
     js["Naam"] = Naam;
+    js["C_v"] = c_v;
+    js["k_s"] = k_s;
     ground_js = js;
 }
 
@@ -114,7 +124,6 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType, float _xP
 void Zettingsberekening::gen_msg()
 {
     std::ostringstream str;
-    std::cout << "gen_msg grond";
     str << "\nzettingsberekining in punt (" << std::setprecision(decimalPrecisionInShout)
         << xPositie << "," << std::setprecision(decimalPrecisionInShout) << yPositie << ")\n"
         << belastingsType.shout() << "\n";
@@ -133,7 +142,7 @@ void Zettingsberekening::addGrondlaag(Grond g)
 
 void Zettingsberekening::berekenZetting()
 {
-    dZetting.clear();
+    dZettingPrim.clear();
     dSigma_eff.clear();
     dDelta_sigma.clear();
     graphDzetting.clear();
@@ -144,6 +153,7 @@ void Zettingsberekening::berekenZetting()
     double finaleSpanningOpZ = 0, HOverC=0, lnGedeelte=0, zettingT=0;
     for (int i = 0; i < grondlagen.size(); i++) {
         double j = 0;
+        double laagzetting = 0;
         while((j+(double)gridSize)<grondlagen[i].laagdikte){
             diepte += gridSize;
             effectieveSpanningOpZ+=grondlagen[i].drogeMassDichtheid*gridSize;
@@ -152,19 +162,30 @@ void Zettingsberekening::berekenZetting()
             HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
             lnGedeelte = std::log( (finaleSpanningOpZ) / (double)effectieveSpanningOpZ);
             zettingT = (double)(HOverC*lnGedeelte);
+            laagzetting += zettingT;
             //stockeer waarden voor latere preview
-            dZetting.push_back(zettingT);
+            dZettingPrim.push_back(zettingT);
             dDelta_sigma.push_back(dDelt_sigma);
             dSigma_eff.push_back(effectieveSpanningOpZ);
             j = j + gridSize;
         }
+        grondlagen[i].primZetting = laagzetting;
     }
     double tot = 0;
-    for (int k = 0; k < dZetting.size(); k++) {
-        tot += (double)dZetting[k];
+    for (int k = 0; k < dZettingPrim.size(); k++) {
+        tot += (double)dZettingPrim[k];
         graphDzetting.insert(graphDzetting.begin(), tot);
     }
     totalePrimaireZetting = tot;
+}
+
+void Zettingsberekening::berekenSecZetting(){
+    //TODO: secundaire zetting, check params in grond. Als kan berekend worden-> bereken. anders? Zet dZettingSec in resp vector.
+    for (int i = 0; i < grondlagen.size(); i++) {
+        double t = 999999999; //neem t zeer groot, dit zal de secundaire zetting na een lange tijd berekenen, t_p moet kleiner zijn dan t
+        grondlagen[i].secZetting= grondlagen[i].dikteNaPrim / (1 + grondlagen[i].e_p)*grondlagen[i].c_alpha*log(t / grondlagen[i].t_p);
+    }
+
 }
 
 void Zettingsberekening::wijzigBelastingsType(BelastingsType b)
@@ -223,6 +244,91 @@ float Zettingsberekening::getDSigmaOpDiepte(float diepte)
 float Zettingsberekening::getGridSize()
 {
     return gridSize;
+}
+
+double Zettingsberekening::Consolidatiegraad(double Tv)
+{
+    double U = 0;
+    bool uselessiteration = true;
+    if (!uselessiteration) {
+        if (Tv < 0.2827433389) {
+            U = 2 * sqrt(PI*Tv) / PI;
+        }
+        else if (Tv >= 0.2827433389) {
+            U = -0.01*exp(-2.467936863*Tv + 4.395395553) + 1;
+        }
+    }
+    U = 1;
+    double M = 0, expPart = 0, T2 = 0;
+    for (double m = 0; m < sumPrecision; m++) {
+        M = std::pow(0.5*PI*(2.0*m + 1), 2);
+        expPart = std::exp(-M*Tv);
+        std::cout << expPart << std::endl;
+        T2 += (2 / M)*expPart;
+    }
+    U -= T2;
+    return U;
+}
+
+double Zettingsberekening::Tijdsfactor(double U){
+    double Tv = 0;
+    if (U < 0.6) {
+        Tv = PI / 4.0 * (U*U);
+    }
+    else {
+        Tv = 1.781 - 0.933*std::log10(100 - 100 * U);
+    }
+    return Tv;
+}
+
+double Zettingsberekening::getZettingNaT(double t){
+    //double T_v = c_v*t / (d*d);
+    double bereikteZetting = 0;
+    double TV = 0;
+    for (unsigned int i = 0; i < grondlagen.size(); i++) {
+        if (i > 0 && i < grondlagen.size() - 1) {
+            //bepaal drainagelengte
+            double drainagelength = getDrainageLength(grondlagen[i-1],
+                grondlagen[i], grondlagen[i+1]);
+            //bereken Tv = C_v*t/(D^2)
+            TV = grondlagen[i].c_v*t / (drainagelength*drainagelength);
+            //std::cout <<"T_v tussenin"<< TV << "\n";
+
+            
+        }
+        else {
+            //dus i =0 of i=grondlagen.size()-1
+            //bereken direct T_v aangezien D=H/2 of dus D^2=H^2*0.25
+            TV = grondlagen[i].c_v*t / (grondlagen[i].laagdikte*grondlagen[i].laagdikte*0.25);
+            //std::cout << "T_v uiteinde" << TV << "\n";
+        }
+        //tel consolidatiegraad * totale primaire zetting vd laag = bereikte zetting vd laag
+        bereikteZetting += Consolidatiegraad(TV)*grondlagen[i].primZetting;
+
+    }
+    return bereikteZetting;
+}
+
+double Zettingsberekening::getTimeToConsolidationDegree(double U){
+    double ZettingBijU = U*totalePrimaireZetting;
+    double TV = Tijdsfactor(U);
+    return 0.0;
+}
+
+double Zettingsberekening::getDrainageLength(Grond & onder, Grond & huidig, Grond & boven){
+    double onderKS =onder.k_s;
+    double bovenKS = boven.k_s;
+    double huidigKS = huidig.k_s;
+    double factor = 1.0;
+    if ( (bovenKS >= 100 * huidigKS) && (onderKS >= 100 * huidigKS) ){
+        factor /= 2.0;
+    }
+    //because of else if exclusive or is a given
+    else if ((onderKS >= 100 * huidigKS)|| (bovenKS >= 100 * huidigKS)) {
+        factor /= 1.0;
+    }
+
+    return huidig.laagdikte*factor;
 }
 
 
