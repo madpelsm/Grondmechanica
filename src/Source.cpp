@@ -13,7 +13,7 @@
 using namespace nanogui;
 
 enum test_enum {
-    UniformStripLoad = 0,
+    uniformPlateLoad = 0,
     PuntLast = 1,
     LijnLast = 2
 };
@@ -35,10 +35,10 @@ double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte,
 beginPosLast, eindPosLast, lastGrootte,c_v=0.0,k_s=0.0,tijd=999999;
 int belastingID = 0;//de locatie van de belasting in de vector met belastingstypes
-int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
-std::string grondnaam = "Grondsoort";
+int WIDTH = 1280, HEIGHT = 800, pointPrecisionInDialog = 5;
+std::string grondnaam = "Grondsoort",huidigeConfig="";
 InfoOpDiepteTypes diepteInfoType = Zetting;
-test_enum loadType = UniformStripLoad;
+test_enum loadType = uniformPlateLoad;
 Color grond_kleur_graph(0.543f,0.269f,0.0742f, 1.f);
 std::vector<Zettingsberekening> sonderingsPunt;
 std::vector<BelastingsType> belastingstypes;
@@ -55,12 +55,12 @@ void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
 std::string writeToFile(std::string _content);
 std::string makeSaveFile(std::vector<Zettingsberekening> &e);
 void readFromFile();
+void updateGraph(VectorXf &func, VectorXf &sigma_eff_val, VectorXf &dSigm_val, VectorXf &dZetting_val);
 std::vector<std::string> split(const std::string &s, char delim);
 
 int main(int argc, char * argv[]) {
     nanogui::init();
     Screen *screen = new Screen(Vector2i(WIDTH, HEIGHT), "Zettingsberekening",true,false,8,8,24,8,2);
-    
 
     bool enabled = true;
 
@@ -68,6 +68,7 @@ int main(int argc, char * argv[]) {
     ref<Window> window3 = belastingGUI->addWindow(Eigen::Vector2i(windowMargin, 
             windowMargin), "Belastingsinformatie");
 
+    
     FormHelper *grondGUI = new FormHelper(screen);
     ref<Window> window2 = grondGUI->addWindow(Eigen::Vector2i(3 * WIDTH / 5, HEIGHT / 2.6), "Grond");
 
@@ -117,7 +118,7 @@ int main(int argc, char * argv[]) {
     belastingGUI->addVariable("Eindpositie van de last", eindPosLast);
     belastingGUI->addVariable("Grote van de last [kN/m^3]", lastGrootte);
     belastingGUI->addVariable("Kies belastingsgeval", loadType, enabled)->setItems(
-        { "Uniforme strip belasting","PuntLast","Lijnlast" });
+        { "Plaat belasting","Point load","Line load" });
     belastingGUI->addButton("Maak last aan", [&screen]() {
         genereerLast(beginPosLast, eindPosLast, lastGrootte, loadType, screen);
     })->setTooltip("Klik om de last aan te maken");
@@ -248,16 +249,8 @@ int main(int argc, char * argv[]) {
 
             dur = (std::clock() - timer) / ((double)CLOCKS_PER_SEC);
             str << "Berekend in " << dur << "s\n" << std::endl;
-            func.resize(sonderingsPunt[0].dZettingPrim.size());
-            sigma_eff_val.resize(sonderingsPunt[0].dZettingPrim.size());
-            dSigm_val.resize(sonderingsPunt[0].dZettingPrim.size());
-            dZetting_val.resize(sonderingsPunt[0].dZettingPrim.size());
-            for (int i = 0; i < sonderingsPunt[0].dZettingPrim.size(); i++) {
-                dZetting_val[i] = graphScale*sonderingsPunt[0].dZettingPrim[i] / sonderingsPunt[0].dZettingPrim[0];
-                dSigm_val[i] = graphScale*sonderingsPunt[0].dDelta_sigma[i] / sonderingsPunt[0].dDelta_sigma[0];
-                sigma_eff_val[i]= graphScale*sonderingsPunt[0].dSigma_eff[i]/ sonderingsPunt[0].dSigma_eff.back();
-                func[i] = graphScale*sonderingsPunt[0].graphDzetting[i]/sonderingsPunt[0].graphDzetting[0];
-            }
+            updateGraph(func,sigma_eff_val,dSigm_val,dZetting_val);
+            
             str.clear();
 
         }
@@ -272,17 +265,20 @@ int main(int argc, char * argv[]) {
     zettingsGUI->addButton("Load", []() {
         readFromFile();
     });
-
-    zettingsGUI->addButton("Toon huidige configuratie", [&screen]() {
-        std::string infoOfLoaded = "";
-        /*for (int i = 0; i < sonderingsPunt.size(); i++) {
-            infoOfLoaded += sonderingsPunt[i].shout();
-        }*/
+    Window * configurationWindow = new Window(screen, "Huidige configuratie");
+    configurationWindow->setLayout(new GroupLayout());
+    VScrollPanel * scroll = new VScrollPanel(configurationWindow);
+    scroll->setFixedSize(Eigen::Vector2i(300, 300));
+    Label * config = new Label(scroll, "Huidige configuratie");
+    config->setFixedSize(Eigen::Vector2i(300, HEIGHT/2));
+    zettingsGUI->addButton("Toon huidige configuratie", [&screen,&zettingsGUI,&config]() {
+        std::ostringstream strst;
         if (sonderingsnummer < sonderingsPunt.size()) {
-            infoOfLoaded += sonderingsPunt[sonderingsnummer].shout();
+            strst << "Consolidatiepunt " << sonderingsnummer << " van de " << sonderingsPunt.size() << ".\n";
+            strst<<sonderingsPunt[sonderingsnummer].shout();
         }
-
-        MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Information, "huidige configuratie", infoOfLoaded, "OK");
+        huidigeConfig = strst.str();
+        config->setCaption(huidigeConfig);
         })->setTooltip("Beschrijving van de grondlagen.");
 
     zettingsGUI->addButton("Export", []() {
@@ -316,7 +312,36 @@ int main(int argc, char * argv[]) {
             MessageDialog* m2 = new MessageDialog(screen, MessageDialog::Type::Information, message.str(), str.str(), "OK", "Cancel", false);
         }
     });
+    zettingsGUI->addButton("Update graph", [&]() {
+        updateGraph(func, sigma_eff_val, dSigm_val, dZetting_val);
+    });
 
+
+    FormHelper * consolidationForm = new FormHelper(screen);
+    Window* consolidationWindow = consolidationForm->addWindow(Eigen::Vector2i(200, 200),"Consolidation point mover");
+
+    float xCons = 0, yCons = 0;
+    if (sonderingsnummer < sonderingsPunt.size()) {
+        xCons = sonderingsPunt[sonderingsnummer].xPositie, yCons = sonderingsPunt[sonderingsnummer].yPositie;
+        std::cout << "got executed" << std::endl;
+    }
+    consolidationForm->refresh();
+    consolidationForm->addVariable("X ", xCons);
+    consolidationForm->addVariable("Y ", yCons);
+    consolidationForm->addButton("submit ", [&xCons,&yCons,&screen]() {
+        if (sonderingsnummer < sonderingsPunt.size()) {
+            std::ostringstream msg_str;
+            msg_str << "Consolidation point moved from " << std::setprecision(pointPrecisionInDialog) <<
+                sonderingsPunt[sonderingsnummer].xPositie << "," << sonderingsPunt[sonderingsnummer].yPositie <<
+                " to " << xCons << "," << yCons << "\n in Consolidation point "<<sonderingsnummer<<"." << std::endl;
+            sonderingsPunt[sonderingsnummer].xPositie = xCons;
+            sonderingsPunt[sonderingsnummer].yPositie = yCons;
+            MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Information, "Succes", msg_str.str(), "OK");
+        }
+        else {
+            MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Warning, "Failed", "Consolidation point move failed.", "OK");
+        }
+    });
 
 
     screen->setLayout(new GridLayout(Orientation::Vertical, 2, Alignment::Middle, windowMargin, 0));
@@ -438,4 +463,19 @@ std::vector<std::string> split(const std::string &s, char delim) {
         elems.push_back(std::move(item));
     }
     return elems;
+}
+
+void updateGraph(VectorXf &func, VectorXf &sigma_eff_val, VectorXf &dSigm_val, VectorXf &dZetting_val) {
+    if (sonderingsnummer < sonderingsPunt.size()) {
+        func.resize(sonderingsPunt[sonderingsnummer].dZettingPrim.size());
+        sigma_eff_val.resize(sonderingsPunt[sonderingsnummer].dZettingPrim.size());
+        dSigm_val.resize(sonderingsPunt[sonderingsnummer].dZettingPrim.size());
+        dZetting_val.resize(sonderingsPunt[sonderingsnummer].dZettingPrim.size());
+        for (int i = 0; i < sonderingsPunt[sonderingsnummer].dZettingPrim.size(); i++) {
+            dZetting_val[i] = graphScale*sonderingsPunt[sonderingsnummer].dZettingPrim[i] / sonderingsPunt[sonderingsnummer].dZettingPrim[0];
+            dSigm_val[i] = graphScale*sonderingsPunt[sonderingsnummer].dDelta_sigma[i] / sonderingsPunt[sonderingsnummer].dDelta_sigma[0];
+            sigma_eff_val[i] = graphScale*sonderingsPunt[sonderingsnummer].dSigma_eff[i] / sonderingsPunt[sonderingsnummer].dSigma_eff.back();
+            func[i] = graphScale*sonderingsPunt[sonderingsnummer].graphDzetting[i] / sonderingsPunt[sonderingsnummer].graphDzetting[0];
+        }
+    }
 }

@@ -28,13 +28,13 @@ Grond::Grond(json grondJS){
 void Grond::gen_msg() {
     std::ostringstream str;
 
-    str << "Grondlaag " << Naam << " met samendrukkingscoefficient C= " <<
+    str << "Grondlaag " << Naam << ", samendrukkingscoefficient C= " <<
         std::setprecision(decimalPrecisionInShout) << samendrukkingsCoeff <<
         " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout) << (bovengrens)
         << "m tot " << std::setprecision(decimalPrecisionInShout) << (ondergrens) <<
-        "m \n De massadichtheid van de grond bedraagt: " << std::setprecision(decimalPrecisionInShout)
+        "m \n droge massadichtheid: " << std::setprecision(decimalPrecisionInShout)
         << (drogeMassDichtheid) << "kN/m^3\n" << "met C_v: " << c_v <<
-        "m^2/s\n" << "met doorlatendheid: " << k_s <<"m/s\n";
+        "m^2/s\n" << "Doorlatendheid: " << k_s <<"m/s\n";
     Message = str.str();
     str.clear();
 }
@@ -157,7 +157,7 @@ void Zettingsberekening::berekenZetting()
         while((j+(double)gridSize)<grondlagen[i].laagdikte){
             diepte += gridSize;
             effectieveSpanningOpZ+=grondlagen[i].drogeMassDichtheid*gridSize;
-            dDelt_sigma = belastingsType.deltaSig(diepte, xPositie);
+            dDelt_sigma = belastingsType.deltaSig(diepte, xPositie,yPositie);
             finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
             HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
             lnGedeelte = std::log( (finaleSpanningOpZ) / (double)effectieveSpanningOpZ);
@@ -263,7 +263,6 @@ double Zettingsberekening::Consolidatiegraad(double Tv)
     for (double m = 0; m < sumPrecision; m++) {
         M = std::pow(0.5*PI*(2.0*m + 1), 2);
         expPart = std::exp(-M*Tv);
-        std::cout << expPart << std::endl;
         T2 += (2 / M)*expPart;
     }
     U -= T2;
@@ -343,7 +342,7 @@ BelastingsType::BelastingsType(json js){
     qs = js["qs"].get<double>();
     type = js["type"].get<int>();
     if (type == 0) {
-        typeNaam = "Uniforme Stripbelasting";
+        typeNaam = "uniforme plaat last";
     }
 
     belastingsBreedte = std::abs(x2 - x1);
@@ -360,7 +359,7 @@ BelastingsType::BelastingsType(float _x1,float _x2, float _qs, int _typeLast) :
     //Type 0 : uniforme strip
     
     if (_typeLast == 0) {
-        typeNaam = "Uniforme Stripbelasting";
+        typeNaam = "uniforme plaat last";
     }
     
     belastingsBreedte = std::abs(x2 - x1);
@@ -369,16 +368,96 @@ BelastingsType::BelastingsType(float _x1,float _x2, float _qs, int _typeLast) :
 
 }
 
-float BelastingsType::deltaSig(float z,float xPositie)
+float BelastingsType::deltaSig(float z,float xPositie,float yPositie)
 {
     float delta_sigma = 0;
-    if (type == 0 && initialised) {
+    if (type == 1 && initialised) {
         //boussinesq uniforme stripbelasting 
         double gamma = std::atan((xPositie - x1) / z);
         double beta = std::atan((xPositie - x2) / z);
         double alpha = gamma - beta;
         delta_sigma = (qs / pi)*(alpha + sin(alpha)*cos(alpha+2*beta));
     }
+
+    if (type == 0 && initialised) {
+        //subdivide in cases
+        //case 1 x1 = L, x2=B resp in x and y dir., spawns rectangle with diagonal (0,0)->(x1=L,x2=B)
+        if (0 <= xPositie && xPositie <= x1 && 0 <= yPositie && yPositie <= x2) {
+            //geval 1.1
+            double sig = 0.0;
+            sig += sigma_plate_load(abs(xPositie), abs(x2 - yPositie), z);
+            //geval 1.2
+            sig += sigma_plate_load(abs(x1 - xPositie), abs(x2 - yPositie), z);
+            //geval 1.3
+            sig += sigma_plate_load(abs(xPositie), abs(yPositie), z);
+            //geval 1.4
+            sig += sigma_plate_load(abs(x1 - xPositie), abs(yPositie), z);
+            delta_sigma = sig;
+            return delta_sigma;
+        }
+        //case 2, x xor y out of rect load area
+        else if (!(0 <= xPositie && xPositie <= x1) && 0 <= yPositie && yPositie <= x2) {
+            double sig = 0.0;
+            if (xPositie >= 0) {
+                sig += sigma_plate_load(abs(xPositie), abs(x2 - yPositie), z);
+                sig += sigma_plate_load(abs(xPositie), abs(yPositie), z);
+                sig -= sigma_plate_load(abs(xPositie - x1), abs(x2 - yPositie), z);
+                sig -= sigma_plate_load(abs(xPositie - x1), abs(yPositie), z);
+            }
+            else {
+                sig += sigma_plate_load(abs(xPositie-x1), abs(x2 - yPositie), z);
+                sig += sigma_plate_load(abs(xPositie-x1), abs(yPositie), z);
+                sig -= sigma_plate_load(abs(xPositie), abs(x2 - yPositie), z);
+                sig -= sigma_plate_load(abs(xPositie), abs(yPositie), z);
+            }
+            delta_sigma = sig;
+            return sig;
+        }
+        else if ((0 <= xPositie && xPositie <= x1) && !(0 <= yPositie && yPositie <= x2)) {
+            //Copy paste of the previous case and change x and y
+            double sig = 0.0;
+            double xP = yPositie;
+            double yP = xPositie;
+            if (xP >= 0) {
+                sig += sigma_plate_load(abs(xP), abs(x1 - yP), z);
+                sig += sigma_plate_load(abs(xP), abs(yP), z);
+                sig -= sigma_plate_load(abs(xP - x2), abs(x1 - yP), z);
+                sig -= sigma_plate_load(abs(xP - x2), abs(yP), z);
+            }
+            else {
+                sig += sigma_plate_load(abs(xP - x2), abs(x1 - yP), z);
+                sig += sigma_plate_load(abs(xP - x2), abs(yP), z);
+                sig -= sigma_plate_load(abs(xP), abs(x1 - yP), z);
+                sig -= sigma_plate_load(abs(xP), abs(yP), z);
+            }
+            delta_sigma = sig;
+            return sig;
+        }
+        //case 3, x and y both out of rectangular load area
+        else if (!(0 <= xPositie && xPositie <= x1) && !(0 <= yPositie && yPositie <= x2)) {
+            double sig = 0.0;
+            double xPos = xPositie;
+            double yPos = yPositie;
+
+            if (xPos < 0 && yPos < 0) {
+                xPos = x1 - xPos;
+                yPos = x2 - yPos;
+            }
+            else if (xPos > 0 && yPos < 0) {
+                yPos = x2 - yPos;
+            }
+            else if (xPos < 0 && yPos>0) {
+                xPos = x1 - xPos;
+            }
+            sig += sigma_plate_load(abs(xPos), abs(yPos), z);
+            sig -= sigma_plate_load(abs(xPos), abs(yPos - x2), z);
+            sig -= sigma_plate_load(abs(xPos - x1), abs(yPos), z);
+            sig += sigma_plate_load(abs(xPos - x1), abs(yPos - x2), z);
+            delta_sigma = sig;
+            return sig;
+        }
+    }
+
     return delta_sigma;
 }
 
@@ -395,9 +474,16 @@ std::string BelastingsType::shout()
 {
     std::ostringstream out;
     
-    out << "Belasting:\n " << std::setprecision(decimalPrecisionInShout)<<x1 << 
-        "m tot " << std::setprecision(decimalPrecisionInShout)<< x2 << "m, \ngrootte "
+    out << "Belasting:\n diagonaal (0,0)->(" << std::setprecision(decimalPrecisionInShout)<<x1 << 
+        "," << std::setprecision(decimalPrecisionInShout)<< x2 << ") [m]\ngrootte "
         << std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^2 \nType " << 
         typeNaam << std::endl;
     return out.str();
+}
+double BelastingsType::sigma_plate_load(double L, double B, double z) {
+    double R1 = pow(L*L + z*z, 0.5);
+    double R2 = pow(B*B + z*z, 0.5);
+    double R3 = pow(L*L + B*B + z*z, 0.5);
+    double s = qs / (2 * pi)*(atan(L*B/(z*R3))+L*B*z/R3*(1/pow(R1,2)+1/pow(R2,2)) );
+    return s;
 }

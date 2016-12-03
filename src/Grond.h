@@ -41,9 +41,10 @@ public:
     BelastingsType();
     BelastingsType(json js);
     BelastingsType(float x1,float x2,float _qs,int _typeLast);
-    float deltaSig(float z,float x);
+    float deltaSig(float z,float x,float yPos =0);
     void gen_js();
     std::string shout();
+    double sigma_plate_load(double L, double B, double z);
 };
 
 
