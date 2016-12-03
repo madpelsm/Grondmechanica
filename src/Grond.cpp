@@ -1,10 +1,17 @@
 #include <Grond.h>
 
 
-Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam,double c_v,double k_s=0.0):
-    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens), Naam(_Naam),
-    ondergrens(_ondergrens),drogeMassDichtheid(_drogeMassaDichtheid),c_v(c_v){
-
+Grond::Grond(float _samendrukkingscoeff, float _bovengrens, 
+    float _ondergrens,float _drogeMassaDichtheid,
+    std::string _Naam,double c_v,double k_s=0.0,
+    double _nattemassadichtheid):
+    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens), 
+    Naam(_Naam),ondergrens(_ondergrens),
+    drogeMassDichtheid(_drogeMassaDichtheid),
+    c_v(c_v),k_s(k_s),natteMassadichtheid(_nattemassadichtheid){
+    if (natteMassadichtheid == 0) {
+        natteMassadichtheid = drogeMassDichtheid*1.1;
+    }
     laagdikte = std::abs(bovengrens - ondergrens);
     gen_js();
     gen_msg();
@@ -17,6 +24,8 @@ Grond::Grond(json grondJS){
     bovengrens = grondJS["bovengrens"].get<double>();
     drogeMassDichtheid = grondJS["drogeMassaDichtheid"].get<double>();
     Naam = grondJS["Naam"].get<std::string>();
+    natteMassadichtheid = grondJS["natteMassadichtheid"].get<double>();
+    //natteMassadichtheid = drogeMassDichtheid;
     c_v = (grondJS["C_v"].get<double>()<0.00000001)?0: grondJS["C_v"].get<double>();
     k_s= (grondJS["k_s"].get<double>()<0.00000001) ? 0 : grondJS["k_s"].get<double>();
     laagdikte = std::abs(bovengrens - ondergrens);
@@ -33,7 +42,8 @@ void Grond::gen_msg() {
         " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout) << (bovengrens)
         << "m tot " << std::setprecision(decimalPrecisionInShout) << (ondergrens) <<
         "m \n droge massadichtheid: " << std::setprecision(decimalPrecisionInShout)
-        << (drogeMassDichtheid) << "kN/m^3\n" << "met C_v: " << c_v <<
+        << (drogeMassDichtheid) << "kN/m^3\nNatte massadichtheid: "<<natteMassadichtheid 
+        << "kN/m^3\nmet C_v: " << c_v <<
         "m^2/s\n" << "Doorlatendheid: " << k_s <<"m/s\n";
     Message = str.str();
     str.clear();
@@ -51,6 +61,7 @@ void Grond::gen_js() {
     js["ondergrens"] = ondergrens;
     js["bovengrens"] = bovengrens;
     js["drogeMassaDichtheid"] = drogeMassDichtheid;
+    js["natteMassadichtheid"] = natteMassadichtheid;
     js["Naam"] = Naam;
     js["C_v"] = c_v;
     js["k_s"] = k_s;
@@ -156,7 +167,12 @@ void Zettingsberekening::berekenZetting()
         double laagzetting = 0;
         while((j+(double)gridSize)<grondlagen[i].laagdikte){
             diepte += gridSize;
-            effectieveSpanningOpZ+=grondlagen[i].drogeMassDichtheid*gridSize;
+            if ((grondlagen[i].bovengrens - j) < fea) {
+                effectieveSpanningOpZ += grondlagen[i].drogeMassDichtheid*gridSize;
+            }
+            else {
+                effectieveSpanningOpZ += grondlagen[i].natteMassadichtheid*gridSize;
+            }
             dDelt_sigma = belastingsType.deltaSig(diepte, xPositie,yPositie);
             finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
             HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);

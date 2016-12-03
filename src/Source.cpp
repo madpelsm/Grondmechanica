@@ -32,7 +32,7 @@ float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
 int windowMargin = 2;
 bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
-xPos, yPos = 0, sonderingsnummer, feaHoogte,
+xPos, yPos = 0, sonderingsnummer, feaHoogte, natteMassadichtheid,
 beginPosLast, eindPosLast, lastGrootte,c_v=0.0,k_s=0.0,tijd=999999;
 int belastingID = 0;//de locatie van de belasting in de vector met belastingstypes
 int WIDTH = 1280, HEIGHT = 800, pointPrecisionInDialog = 5;
@@ -47,7 +47,7 @@ std::vector<BelastingsType> belastingstypes;
 void addSolidLayerToSondering(double bovengrens, double ondergrens, 
         double samendrukkingsconstante, double drogemassadichtheid, 
         std::string grondnaam, int sondering, Screen * screen,double c_v,
-        double k_s);
+        double k_s,double natteMassaDichtheid);
 void genereerLast(double beginPosLast, double eindPosLast, double 
         lastGrootte, test_enum enumval, Screen * screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos, 
@@ -103,6 +103,7 @@ int main(int argc, char * argv[]) {
     grondGUI->addVariable("Samendrukkingsconstante C", samendrukkingsconstante)->setTooltip(
             "Geprefereerd de C uit de laboproeven.");
     grondGUI->addVariable("Droge massadichtheid kN/m^3", drogeMassadichtheid);
+    grondGUI->addVariable("Natte massadichtheid kN/m^3", natteMassadichtheid);
     grondGUI->addVariable("C_v", c_v);
     grondGUI->addVariable("Doorlatendheidsfactor", k_s);
 
@@ -110,7 +111,7 @@ int main(int argc, char * argv[]) {
     grondGUI->addButton("Voeg grondlaag toe", [&screen]() {
         addSolidLayerToSondering(bovengrens, ondergrens,
             samendrukkingsconstante, drogeMassadichtheid,
-            grondnaam, sonderingsnummer, screen,c_v,k_s);
+            grondnaam, sonderingsnummer, screen,c_v,k_s, natteMassadichtheid);
     });
 
     belastingGUI->addGroup("Belasting");
@@ -274,7 +275,7 @@ int main(int argc, char * argv[]) {
     zettingsGUI->addButton("Toon huidige configuratie", [&screen,&zettingsGUI,&config]() {
         std::ostringstream strst;
         if (sonderingsnummer < sonderingsPunt.size()) {
-            strst << "Consolidatiepunt " << sonderingsnummer << " van de " << sonderingsPunt.size() << ".\n";
+            strst << "Consolidatiepunt " << sonderingsnummer << " van de " << sonderingsPunt.size()-1 << ".\n";
             strst<<sonderingsPunt[sonderingsnummer].shout();
         }
         huidigeConfig = strst.str();
@@ -357,10 +358,10 @@ int main(int argc, char * argv[]) {
 }
 
 void addSolidLayerToSondering(double bovengrens, double ondergrens, double samendrukkingsconstante,
-    double drogemassadichtheid, std::string grondnaam, int sondering, Screen * screen,double c_v,double k_s) {
+    double drogemassadichtheid, std::string grondnaam, int sondering, Screen * screen,double c_v,double k_s,double natteMassadichtheid) {
 
     if ((sondering) < sonderingsPunt.size()) {
-        sonderingsPunt[sondering].addGrondlaag(Grond(samendrukkingsconstante, bovengrens, ondergrens, drogemassadichtheid, grondnaam,c_v,k_s));
+        sonderingsPunt[sondering].addGrondlaag(Grond(samendrukkingsconstante, bovengrens, ondergrens, drogemassadichtheid, grondnaam,c_v,k_s, natteMassadichtheid));
         std::string t = sonderingsPunt[sondering].grondlagen[sonderingsPunt[sondering].grondlagen.size() - 1].shout();
         MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Grondlaag toegevoegd aan zettingsberekingspunt", t, "OK", "Cancel", false);
     }
@@ -449,10 +450,12 @@ void readFromFile() {
         myfile >> inputJS;
         myfile.close();
     }
-    std::vector<json> inputVectors = inputJS["zettingsberekingspunten"].get<std::vector<json>>();
-    for (int i = 0; i < inputVectors.size(); i++) {
-        sonderingsPunt.push_back(Zettingsberekening(inputVectors[i]));
-        belastingstypes.push_back(sonderingsPunt[i].belastingsType);
+    if (inputJS.size()!=0) {
+        std::vector<json> inputVectors = inputJS["zettingsberekingspunten"].get<std::vector<json>>();
+        for (int i = 0; i < inputVectors.size(); i++) {
+            sonderingsPunt.push_back(Zettingsberekening(inputVectors[i]));
+            belastingstypes.push_back(sonderingsPunt[i].belastingsType);
+        }
     }
 }
 std::vector<std::string> split(const std::string &s, char delim) {
