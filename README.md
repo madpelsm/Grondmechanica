@@ -1,6 +1,6 @@
 <h1> Grondmechanica: Zettingsberekening</h1>
 <h2>Compile</h2>
-<p>On linux, adjust cmake to the proper include directories for nanogui. </br>
+<p>Using cmake, adjust cmake to the proper include directories for nanogui. </br>
 Clone nanogui to wherever you want (recursive), build it (shared). place the .so lib file in /dep.</p>
 <h2>Usage</h2>
 <h3>Load Type</h3>
