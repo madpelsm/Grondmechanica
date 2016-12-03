@@ -7,7 +7,7 @@ Clone nanogui to wherever you want (recursive), build it (shared). place the lib
 <h3>Load Type</h3>
 <p>First create a load type</br>
 <h5>Plate load</h5>
-<p>This has now completely replaced the old uniform strip load</p></br>
+<p>This has now completely replaced the old uniform strip load</p>
 Start and end point represent respectively the width and height of the load. It will spawn a rectangle with diagonal (0,0)->(beginPoint,EndPoint).</br>
 Define the position using X and Y for the calculation point (X,Y). This represents the relative position to (0,0) of the rectangle. </br>
 The point is within the load surface as long as (0<=X<=width) and (0<=Y<=height).
