@@ -85,8 +85,7 @@ int main(int argc, char * argv[]) {
             "Dit is het punt waar we de zetting in zullen berekenen, dit kan op de plaats van een sondering of een boring zijn.");
     sonderingGUI->addVariable("X positie [m]", xPos)->setTooltip("De plaats in de richting van de breedte van de last");
     sonderingGUI->addVariable("Y Positie [m]", yPos);
-    sonderingGUI->addVariable("Freatisch oppervlakhoogte [m]", feaHoogte)->setTooltip(
-            "Indien dit gekend is, dit is niet noodzakelijk");
+    sonderingGUI->addVariable("Freatisch oppervlak hoogte [m]", feaHoogte);
     sonderingGUI->addButton("Maak zettingspunt aan", [&screen]() {
         genereerSonderingsPunt(sonderingsnummer, xPos, yPos, feaHoogte, loadType, screen);
 

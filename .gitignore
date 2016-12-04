@@ -2,6 +2,7 @@
 gitattributes
 Debug/
 Debug
+build/
 Release
 Release/
 Grondmechanica.vcxproj
