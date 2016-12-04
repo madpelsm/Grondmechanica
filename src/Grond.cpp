@@ -136,7 +136,7 @@ void Zettingsberekening::gen_msg()
 {
     std::ostringstream str;
     str << "\nzettingsberekining in punt (" << std::setprecision(decimalPrecisionInShout)
-        << xPositie << "," << std::setprecision(decimalPrecisionInShout) << yPositie << ")\n"
+        << xPositie << "," << std::setprecision(decimalPrecisionInShout) << yPositie <<") Fea: "<<fea<< "m\n"
         << belastingsType.shout() << "\n";
     for (int i = 0; i < grondlagen.size(); i++) {
         str << grondlagen[i].shout() << "\n";
