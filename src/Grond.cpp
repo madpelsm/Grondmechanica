@@ -1,14 +1,15 @@
 #include <Grond.h>
 
 
-Grond::Grond(float _samendrukkingscoeff, float _bovengrens, 
+Grond::Grond(float _samendrukkingscoeff, float _bovengrens,
     float _ondergrens,float _drogeMassaDichtheid,
     std::string _Naam,double c_v,double k_s=0.0,
     double _nattemassadichtheid):
-    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens), 
+    samendrukkingsCoeff(_samendrukkingscoeff),bovengrens(_bovengrens),
     Naam(_Naam),ondergrens(_ondergrens),
     drogeMassDichtheid(_drogeMassaDichtheid),
-    c_v(c_v),k_s(k_s),natteMassadichtheid(_nattemassadichtheid){
+    c_v(c_v),k_s(k_s),natteMassadichtheid(_nattemassadichtheid)
+{
     if (natteMassadichtheid == 0) {
         natteMassadichtheid = drogeMassDichtheid*1.1;
     }
@@ -17,8 +18,8 @@ Grond::Grond(float _samendrukkingscoeff, float _bovengrens,
     gen_msg();
 }
 
-Grond::Grond(json grondJS){
-
+Grond::Grond(json grondJS)
+{
     samendrukkingsCoeff = grondJS["samendrukkingsCoeff"].get<double>();
     ondergrens = grondJS["ondergrens"].get<double>();
     bovengrens = grondJS["bovengrens"].get<double>();
@@ -26,8 +27,8 @@ Grond::Grond(json grondJS){
     Naam = grondJS["Naam"].get<std::string>();
     natteMassadichtheid = grondJS["natteMassadichtheid"].get<double>();
     //natteMassadichtheid = drogeMassDichtheid;
-    c_v = (grondJS["C_v"].get<double>()<0.00000001)?0: grondJS["C_v"].get<double>();
-    k_s= (grondJS["k_s"].get<double>()<0.00000001) ? 0 : grondJS["k_s"].get<double>();
+    c_v = (grondJS["C_v"].get<double>()<0.00000001) ? 0 : grondJS["C_v"].get<double>();
+    k_s = (grondJS["k_s"].get<double>()<0.00000001) ? 0 : grondJS["k_s"].get<double>();
     laagdikte = std::abs(bovengrens - ondergrens);
     ground_js = grondJS;
     //gen_js();
@@ -42,7 +43,7 @@ void Grond::gen_msg() {
         " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout) << (bovengrens)
         << "m tot " << std::setprecision(decimalPrecisionInShout) << (ondergrens) <<
         "m \n droge massadichtheid: " << std::setprecision(decimalPrecisionInShout)
-        << (drogeMassDichtheid) << "kN/m^3\nNatte massadichtheid: "<<natteMassadichtheid 
+        << (drogeMassDichtheid) << "kN/m^3\nNatte massadichtheid: "<<natteMassadichtheid
         << "kN/m^3\nmet C_v: " << c_v <<
         "m^2/s\n" << "Doorlatendheid: " << k_s <<"m/s\n";
     Message = str.str();
@@ -68,25 +69,19 @@ void Grond::gen_js() {
     ground_js = js;
 }
 
-Grond::~Grond()
-{
-}
+Grond::~Grond() { }
 
 std::string Grond::shout()
 {
     return Message;
 }
 
-Zettingsberekening::~Zettingsberekening()
+Zettingsberekening::~Zettingsberekening() { }
+
+Zettingsberekening::Zettingsberekening() { }
+
+Zettingsberekening::Zettingsberekening(json js)
 {
-}
-
-Zettingsberekening::Zettingsberekening()
-{
-}
-
-Zettingsberekening::Zettingsberekening(json js){
-
     belastingsType = BelastingsType(js["belasting"]);
 
     std::vector<json> grondlagenJS = js["grondlagen"].get<std::vector<json>>();
@@ -109,7 +104,8 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType,float _xPo
     gen_msg();
 }
 
-void Zettingsberekening::gen_js(){
+void Zettingsberekening::gen_js()
+{
     json js;
     js["belasting"] = belastingsType.belastingsTypeJS;
     std::vector<json> grondlagen_js;
@@ -120,7 +116,6 @@ void Zettingsberekening::gen_js(){
     js["x"] = xPositie;
     js["y"] = yPositie;
     zettingsBerekeningJS = js;
-
 }
 
 Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType, float _xPos)
@@ -129,7 +124,6 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType, float _xP
     xPositie = _xPos;
     yPositie = 0;
     gen_msg();
-
 }
 
 void Zettingsberekening::gen_msg()
@@ -157,6 +151,15 @@ void Zettingsberekening::berekenZetting()
     dSigma_eff.clear();
     dDelta_sigma.clear();
     graphDzetting.clear();
+    int num_elements = 0;
+    for (int i = 0; i < grondlagen.size(); ++i) {
+        num_elements += std::ceil(grondlagen[i].laagdikte / (double) gridSize);
+        num_elements++;
+    }
+    dZettingPrim.reserve(num_elements);
+    dSigma_eff.reserve(num_elements);
+    dDelta_sigma.reserve(num_elements);
+
     double effectieveSpanningOpZ = 0;
     double diepte = 0;
     double totZetting = 0;
@@ -188,9 +191,10 @@ void Zettingsberekening::berekenZetting()
         grondlagen[i].primZetting = laagzetting;
     }
     double tot = 0;
+    graphDzetting.resize(dZettingPrim.size(), 0.0)
     for (int k = 0; k < dZettingPrim.size(); k++) {
         tot += (double)dZettingPrim[k];
-        graphDzetting.insert(graphDzetting.begin(), tot);
+        graphDzetting[dZettingPrim.size() - 1 - k] = tot;
     }
     totalePrimaireZetting = tot;
 }
@@ -201,7 +205,6 @@ void Zettingsberekening::berekenSecZetting(){
         double t = 999999999; //neem t zeer groot, dit zal de secundaire zetting na een lange tijd berekenen, t_p moet kleiner zijn dan t
         grondlagen[i].secZetting= grondlagen[i].dikteNaPrim / (1 + grondlagen[i].e_p)*grondlagen[i].c_alpha*log(t / grondlagen[i].t_p);
     }
-
 }
 
 void Zettingsberekening::wijzigBelastingsType(BelastingsType b)
@@ -243,7 +246,6 @@ float Zettingsberekening::getOpDiepte(float diepte, std::vector<double> &DiepteI
 
 float Zettingsberekening::getZettingOpDiepte(float diepte)
 {
-   
     return getOpDiepte(diepte,graphDzetting);
 }
 
@@ -285,18 +287,19 @@ double Zettingsberekening::Consolidatiegraad(double Tv)
     return U;
 }
 
-double Zettingsberekening::Tijdsfactor(double U){
+double Zettingsberekening::Tijdsfactor(double U)
+{
     double Tv = 0;
     if (U < 0.6) {
         Tv = PI / 4.0 * (U*U);
-    }
-    else {
+    } else {
         Tv = 1.781 - 0.933*std::log10(100 - 100 * U);
     }
     return Tv;
 }
 
-double Zettingsberekening::getZettingNaT(double t){
+double Zettingsberekening::getZettingNaT(double t)
+{
     //double T_v = c_v*t / (d*d);
     double bereikteZetting = 0;
     double TV = 0;
@@ -308,10 +311,7 @@ double Zettingsberekening::getZettingNaT(double t){
             //bereken Tv = C_v*t/(D^2)
             TV = grondlagen[i].c_v*t / (drainagelength*drainagelength);
             //std::cout <<"T_v tussenin"<< TV << "\n";
-
-            
-        }
-        else {
+        } else {
             //dus i =0 of i=grondlagen.size()-1
             //bereken direct T_v aangezien D=H/2 of dus D^2=H^2*0.25
             TV = grondlagen[i].c_v*t / (grondlagen[i].laagdikte*grondlagen[i].laagdikte*0.25);
@@ -324,22 +324,23 @@ double Zettingsberekening::getZettingNaT(double t){
     return bereikteZetting;
 }
 
-double Zettingsberekening::getTimeToConsolidationDegree(double U){
+double Zettingsberekening::getTimeToConsolidationDegree(double U)
+{
     double ZettingBijU = U*totalePrimaireZetting;
     double TV = Tijdsfactor(U);
     return 0.0;
 }
 
-double Zettingsberekening::getDrainageLength(Grond & onder, Grond & huidig, Grond & boven){
+double Zettingsberekening::getDrainageLength(Grond & onder, Grond & huidig, Grond & boven)
+{
     double onderKS =onder.k_s;
     double bovenKS = boven.k_s;
     double huidigKS = huidig.k_s;
     double factor = 1.0;
     if ( (bovenKS >= 100 * huidigKS) && (onderKS >= 100 * huidigKS) ){
         factor /= 2.0;
-    }
-    else if ((onderKS >= 100 * huidigKS) || (bovenKS >= 100 * huidigKS)
-            && ! ((bovenKS >= 100 * huidigKS) && (onderKS >= 100 * huidigKS))  ) {
+    } else if ((onderKS >= 100 * huidigKS) || (bovenKS >= 100 * huidigKS)
+               && ! ((bovenKS >= 100 * huidigKS) && (onderKS >= 100 * huidigKS))  ) {
         factor /= 1.0;
     }
 
@@ -347,12 +348,10 @@ double Zettingsberekening::getDrainageLength(Grond & onder, Grond & huidig, Gron
 }
 
 
-BelastingsType::BelastingsType()
-{
-    
-}
+BelastingsType::BelastingsType() { }
 
-BelastingsType::BelastingsType(json js){
+BelastingsType::BelastingsType(json js)
+{
     x1 = js["x1"].get<double>();
     x2 = js["x2"].get<double>();
     qs = js["qs"].get<double>();
@@ -367,28 +366,26 @@ BelastingsType::BelastingsType(json js){
 }
 
 BelastingsType::BelastingsType(float _x1,float _x2, float _qs, int _typeLast) :
-    x1(_x1),x2(_x2)
-    , qs(_qs), type(_typeLast)
+    x1(_x1), x2(_x2), qs(_qs), type(_typeLast)
 {
     //breedte in m
     //qs is de blasting in kN/m^3
     //Type 0 : uniforme strip
-    
+
     if (_typeLast == 0) {
         typeNaam = "uniforme plaat last";
     }
-    
+
     belastingsBreedte = std::abs(x2 - x1);
     initialised = true;
     gen_js();
-
 }
 
 float BelastingsType::deltaSig(float z,float xPositie,float yPositie)
 {
     float delta_sigma = 0;
     if (type == 1 && initialised) {
-        //boussinesq uniforme stripbelasting 
+        //boussinesq uniforme stripbelasting
         double gamma = std::atan((xPositie - x1) / z);
         double beta = std::atan((xPositie - x2) / z);
         double alpha = gamma - beta;
@@ -458,11 +455,9 @@ float BelastingsType::deltaSig(float z,float xPositie,float yPositie)
             if (xPos < 0 && yPos < 0) {
                 xPos = x1 - xPos;
                 yPos = x2 - yPos;
-            }
-            else if (xPos > 0 && yPos < 0) {
+            } else if (xPos > 0 && yPos < 0) {
                 yPos = x2 - yPos;
-            }
-            else if (xPos < 0 && yPos>0) {
+            } else if (xPos < 0 && yPos>0) {
                 xPos = x1 - xPos;
             }
             sig += sigma_plate_load(abs(xPos), abs(yPos), z);
@@ -477,7 +472,8 @@ float BelastingsType::deltaSig(float z,float xPositie,float yPositie)
     return delta_sigma;
 }
 
-void BelastingsType::gen_js(){
+void BelastingsType::gen_js()
+{
     json js;
     js["x1"] = x1;
     js["x2"] = x2;
@@ -489,14 +485,16 @@ void BelastingsType::gen_js(){
 std::string BelastingsType::shout()
 {
     std::ostringstream out;
-    
-    out << "Belasting:\n diagonaal (0,0)->(" << std::setprecision(decimalPrecisionInShout)<<x1 << 
+
+    out << "Belasting:\n diagonaal (0,0)->(" << std::setprecision(decimalPrecisionInShout)<<x1 <<
         "," << std::setprecision(decimalPrecisionInShout)<< x2 << ") [m]\ngrootte "
-        << std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^2 \nType " << 
+        << std::setprecision(decimalPrecisionInShout)<<(qs) << "kN/m^2 \nType " <<
         typeNaam << std::endl;
     return out.str();
 }
-double BelastingsType::sigma_plate_load(double L, double B, double z) {
+
+double BelastingsType::sigma_plate_load(double L, double B, double z)
+{
     double R1 = pow(L*L + z*z, 0.5);
     double R2 = pow(B*B + z*z, 0.5);
     double R3 = pow(L*L + B*B + z*z, 0.5);
