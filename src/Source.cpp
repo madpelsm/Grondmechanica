@@ -35,7 +35,7 @@ double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte, natteMassadichtheid,
 beginPosLast, eindPosLast, lastGrootte,c_v=0.0,k_s=0.0,tijd=999999;
 int belastingID = 0;//de locatie van de belasting in de vector met belastingstypes
-int WIDTH = 1280, HEIGHT = 800, pointPrecisionInDialog = 5;
+int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort",huidigeConfig="";
 InfoOpDiepteTypes diepteInfoType = Zetting;
 test_enum loadType = uniformPlateLoad;
@@ -63,23 +63,33 @@ int main(int argc, char * argv[]) {
     Screen *screen = new Screen(Vector2i(WIDTH, HEIGHT), "Zettingsberekening",true,false,8,8,24,8,2);
 
     bool enabled = true;
-
+    //Window placement
     FormHelper * belastingGUI = new FormHelper(screen);
-    ref<Window> window3 = belastingGUI->addWindow(Eigen::Vector2i(windowMargin, 
-            windowMargin), "Belastingsinformatie");
-
-    
+    ref<Window> window3 = belastingGUI->addWindow(Eigen::Vector2i(10, 
+            10), "Belastingsinformatie");
     FormHelper *grondGUI = new FormHelper(screen);
-    ref<Window> window2 = grondGUI->addWindow(Eigen::Vector2i(3 * WIDTH / 5, HEIGHT / 2.6), "Grond");
-
-
+    ref<Window> window2 = grondGUI->addWindow(Eigen::Vector2i(WIDTH/3.1, windowMargin), "Grond");
+    
     FormHelper *sonderingGUI = new FormHelper(screen);
-    ref<Window> window1 = sonderingGUI->addWindow(Eigen::Vector2i(3.2*WIDTH / 5, windowMargin), "Sonderingsinformatie");
+    ref<Window> window1 = sonderingGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 50), "Sonderingsinformatie");
 
     FormHelper *zettingsGUI = new FormHelper(screen);
-    ref<Window> window4 = zettingsGUI->addWindow(Eigen::Vector2i(windowMargin, HEIGHT / 5 * 2), "Zettingen");
+    ref<Window> window4 = zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 1.9), "Zettingen");
+    
+    FormHelper * consolidationForm = new FormHelper(screen);
+    Window* consolidationWindow = consolidationForm->addWindow(Eigen::Vector2i(WIDTH/16, HEIGHT/3.1), "Consolidation point mover");
+    
+    Window *w = new Window(screen, "Graph");
+    int wW = 400, wH = 200;
+    w->setPosition(Eigen::Vector2i(WIDTH/4, HEIGHT/1.8));
+    w->setFixedWidth(wW);
+    w->setVisible(true);
 
+    Window * configurationWindow = new Window(screen, "Huidige configuratie");
+    configurationWindow->setLayout(new GroupLayout());
+    configurationWindow->setPosition(Eigen::Vector2i(WIDTH / 1.5-5, HEIGHT / 2.1));
 
+    //GUI build
     sonderingGUI->addGroup("Locatie")->setTooltip("Plaats waar we de zetting zullen berekenen.");
     sonderingGUI->addVariable("Zettingspunt", sonderingsnummer)->setTooltip(
             "Dit is het punt waar we de zetting in zullen berekenen, dit kan op de plaats van een sondering of een boring zijn.");
@@ -122,13 +132,6 @@ int main(int argc, char * argv[]) {
     belastingGUI->addButton("Maak last aan", [&screen]() {
         genereerLast(beginPosLast, eindPosLast, lastGrootte, loadType, screen);
     })->setTooltip("Klik om de last aan te maken");
-    int wW = 400, wH = 200;
-
-    Window *w = new Window(screen, "Graph");
-    w->setPosition(Eigen::Vector2i(2 * WIDTH / 6, 2.5 * HEIGHT / 7));
-    w->setFixedWidth(wW);
-    w->setVisible(true);
-
 
     TabWidget * graphTabs = new TabWidget(w);
     Widget * zettingGraphWidg = graphTabs->createTab("Zetting");
@@ -265,8 +268,6 @@ int main(int argc, char * argv[]) {
     zettingsGUI->addButton("Load", []() {
         readFromFile();
     });
-    Window * configurationWindow = new Window(screen, "Huidige configuratie");
-    configurationWindow->setLayout(new GroupLayout());
     VScrollPanel * scroll = new VScrollPanel(configurationWindow);
     scroll->setFixedSize(Eigen::Vector2i(300, 300));
     Label * config = new Label(scroll, "Huidige configuratie");
@@ -317,9 +318,7 @@ int main(int argc, char * argv[]) {
     });
 
 
-    FormHelper * consolidationForm = new FormHelper(screen);
-    Window* consolidationWindow = consolidationForm->addWindow(Eigen::Vector2i(200, 200),"Consolidation point mover");
-
+    
     float xCons = 0, yCons = 0;
     if (sonderingsnummer < sonderingsPunt.size()) {
         xCons = sonderingsPunt[sonderingsnummer].xPositie, yCons = sonderingsPunt[sonderingsnummer].yPositie;
@@ -344,7 +343,7 @@ int main(int argc, char * argv[]) {
     });
 
 
-    screen->setLayout(new GridLayout(Orientation::Vertical, 2, Alignment::Middle, windowMargin, 0));
+    //screen->setLayout(new GridLayout(Orientation::Vertical, 2, Alignment::Middle, windowMargin, 0));
     screen->setVisible(true);
     window3->setParent(screen);
     screen->performLayout();
