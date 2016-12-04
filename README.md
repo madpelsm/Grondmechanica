@@ -12,6 +12,11 @@ Start and end point represent respectively the width and height of the load. It 
 Define the position using X and Y for the calculation point (X,Y). This represents the relative position to (0,0) of the rectangle. </br>
 The point is within the load surface as long as (0<=X<=width) and (0<=Y<=height).
 </br>
+<h5>Uniform strip load</h5>
+<b>Deprecated</b>
+You just have to define the width of the load.(via starting point and endpoint -> end-start = width). 
+any calculations will be done using the X position relative to the begin and end point of the stripload, since any change in Y does not affect the results if X is constant. Since the assumption of infinitely long uniform strip load was made. 
+</br> 
 <h6>Then define a point relative to the position of the load, in which you want to calculate the consolidation.</h6>
 <h3>Solid types</h3>
 Positions of the solid layers are relative, but <b>the order in which entries are made are important.</b> Layers do not overlap automaticly. E.g.
