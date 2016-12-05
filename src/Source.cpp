@@ -33,7 +33,7 @@ int windowMargin = 5;
 bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte, natteMassadichtheid,
-beginPosLast, eindPosLast, lastGrootte,c_v=0.0,k_s=0.0,tijd=999999;
+beginPosLast, eindPosLast, lastGrootte, c_v = 0.0, k_s = 0.0, tijd = 999999, OCR = 1, ontlastingsconstante = 1;
 int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort",huidigeConfig="";
 test_enum loadType = uniformPlateLoad;
@@ -43,7 +43,7 @@ std::vector<Zettingsberekening> sonderingsPunt;
 void addSolidLayerToSondering(double bovengrens, double ondergrens, 
         double samendrukkingsconstante, double drogemassadichtheid, 
         std::string grondnaam, int sondering, Screen * screen,double c_v,
-        double k_s,double natteMassaDichtheid);
+        double k_s,double natteMassaDichtheid, double _OCR, double _ontlastingsconstante);
 void genereerLast(double beginPosLast, double eindPosLast, double 
         lastGrootte, test_enum enumval, Screen * screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos, 
@@ -135,16 +135,23 @@ int main(int argc, char * argv[]) {
     grondGUI->addGroup("Mechanische parameters");
     grondGUI->addVariable("Samendrukkingsconstante C", samendrukkingsconstante)->setTooltip(
             "Geprefereerd de C uit de laboproeven.");
+    grondGUI->addVariable("Ontlastingsconstante", ontlastingsconstante);
+    grondGUI->addVariable("OCR", OCR);
     grondGUI->addVariable("Droge massadichtheid kN/m^3", drogeMassadichtheid);
     grondGUI->addVariable("Natte massadichtheid kN/m^3", natteMassadichtheid);
     grondGUI->addVariable("C_v", c_v);
     grondGUI->addVariable("Doorlatendheidsfactor", k_s);
 
-    grondGUI->addGroup("Bevestig");
     grondGUI->addButton("Voeg grondlaag toe", [&screen,&config]() {
-        addSolidLayerToSondering(bovengrens, ondergrens,
-            samendrukkingsconstante, drogeMassadichtheid,
-            grondnaam, sonderingsnummer, screen,c_v,k_s, natteMassadichtheid);
+        if (OCR > 1 && ontlastingsconstante == 0) {
+            MessageDialog * m = new MessageDialog(screen,
+                MessageDialog::Type::Warning, "OCR fout", "Ontlastingsconstante kan niet 0 zijn als OCR>1", "ok");
+        }
+        else {
+            addSolidLayerToSondering(bovengrens, ondergrens,
+                samendrukkingsconstante, drogeMassadichtheid,
+                grondnaam, sonderingsnummer, screen, c_v, k_s, natteMassadichtheid,OCR,ontlastingsconstante);
+        }
         updateConfigText(config);
     });
 
@@ -342,7 +349,7 @@ int main(int argc, char * argv[]) {
     float xCons = 0, yCons = 0;
     if (sonderingsnummer < sonderingsPunt.size()) {
         xCons = sonderingsPunt[sonderingsnummer].xPositie, yCons = sonderingsPunt[sonderingsnummer].yPositie;
-        std::cout << "got executed" << std::endl;
+        //std::cout << "got executed" << std::endl;
     }
     consolidationForm->refresh();
     consolidationForm->addVariable("X ", xCons);
@@ -374,10 +381,13 @@ int main(int argc, char * argv[]) {
 }
 
 void addSolidLayerToSondering(double bovengrens, double ondergrens, double samendrukkingsconstante,
-    double drogemassadichtheid, std::string grondnaam, int sondering, Screen * screen,double c_v,double k_s,double natteMassadichtheid) {
+    double drogemassadichtheid, std::string grondnaam, int sondering, Screen * screen,
+    double c_v,double k_s,double natteMassadichtheid,double _OCR,double _ontlastingsconstante) {
 
     if ((sondering) < sonderingsPunt.size()) {
-        sonderingsPunt[sondering].addGrondlaag(Grond(samendrukkingsconstante, bovengrens, ondergrens, drogemassadichtheid, grondnaam,c_v,k_s, natteMassadichtheid));
+        sonderingsPunt[sondering].addGrondlaag(Grond(samendrukkingsconstante, 
+            bovengrens, ondergrens, drogemassadichtheid, grondnaam,
+            c_v,k_s, natteMassadichtheid, _OCR, _ontlastingsconstante));
         std::string t = sonderingsPunt[sondering].grondlagen[sonderingsPunt[sondering].grondlagen.size() - 1].shout();
         MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Grondlaag toegevoegd aan zettingsberekingspunt", t, "OK", "Cancel", false);
     }
@@ -399,13 +409,16 @@ void updateConfigText(Label * config) {
 
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte, test_enum enumval, 
     Screen * screen) {
-
+    std::ostringstream str;
     if (sonderingsnummer < sonderingsPunt.size()) {
         sonderingsPunt[sonderingsnummer].wijzigBelastingsType(BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
-        std::ostringstream str;
-        str << "Belasting aangemaakt in " << sonderingsnummer << "." << std::endl;
-        MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, str.str(), sonderingsPunt[sonderingsnummer].belastingsType.shout(), "OK", "Cancel", false);
+        str << "Belasting gewijzigd in " << sonderingsnummer << "." << std::endl;
     }
+    else {
+        str << "gelieve eerst een punt aan te maken" << std::endl;
+    }
+    MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Belasting" , str.str(), "OK", "Cancel", false);
+    str.clear();
     //if (enumval < belastingstypes.size()) {
     //    // 1 belasting per keer. indien een nieuwe uniforme striplast -> overschrijf de vorige
     //    belastingstypes[enumval] = (BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));

@@ -2,17 +2,20 @@
 
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
              float _drogeMassaDichtheid, std::string _Naam, double c_v,
-             double k_s = 0.0, double _nattemassadichtheid)
+             double k_s = 0.0, double _nattemassadichtheid,double _OCR,double _ontlastingsconstante)
     : samendrukkingsCoeff(_samendrukkingscoeff),
       bovengrens(_bovengrens),
       Naam(_Naam),
       ondergrens(_ondergrens),
       drogeMassDichtheid(_drogeMassaDichtheid),
-      c_v(c_v),
-      k_s(k_s),
-      natteMassadichtheid(_nattemassadichtheid) {
+      c_v(c_v), k_s(k_s),
+      natteMassadichtheid(_nattemassadichtheid),
+      OCR(_OCR),ontlastingsconstante(_ontlastingsconstante){
     if (natteMassadichtheid == 0) {
         natteMassadichtheid = drogeMassDichtheid * 1.1;
+    }
+    if (ontlastingsconstante == 1) {
+        ontlastingsconstante = samendrukkingsCoeff;
     }
     laagdikte = std::abs(bovengrens - ondergrens);
     gen_js();
@@ -27,27 +30,32 @@ Grond::Grond(json grondJS) {
     Naam = grondJS["Naam"].get<std::string>();
     natteMassadichtheid = grondJS["natteMassadichtheid"].get<double>();
     // natteMassadichtheid = drogeMassDichtheid;
-    c_v = (grondJS["C_v"].get<double>() < 0.00000001)
+    c_v = (grondJS["C_v"].get<double>() < 0.00000000001)
               ? 0
               : grondJS["C_v"].get<double>();
-    k_s = (grondJS["k_s"].get<double>() < 0.00000001)
+    k_s = (grondJS["k_s"].get<double>() < 0.00000000001)
               ? 0
               : grondJS["k_s"].get<double>();
+    //protect against division by 0
+    ontlastingsconstante = (grondJS["Ontlastingsconstante"].get<double>()<0.000001)?
+        1 : grondJS["Ontlastingsconstante"].get<double>();
+    OCR = (grondJS["OCR"].get<double>()<1)?1:grondJS["OCR"].get<double>();
     laagdikte = std::abs(bovengrens - ondergrens);
-    ground_js = grondJS;
-    // gen_js();
+    // ground_js = grondJS;
+    gen_js();
     gen_msg();
 }
 
 void Grond::gen_msg() {
     std::ostringstream str;
 
-    str << "Grondlaag " << Naam << "\nsamendrukkingscoefficient C= "
+    str << "Grondlaag " << Naam << "\nsamendrukkingscoefficient C: "
         << std::setprecision(decimalPrecisionInShout) << samendrukkingsCoeff
+        <<"\nOntlastingsconstante: "<<ontlastingsconstante<<"\nOCR:"<<OCR
         << " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout)
         << (bovengrens) << "m tot "
         << std::setprecision(decimalPrecisionInShout) << (ondergrens)
-        << "m \n droge massadichtheid: "
+        << "m\n droge massadichtheid: "
         << std::setprecision(decimalPrecisionInShout) << (drogeMassDichtheid)
         << "kN/m^3\nNatte massadichtheid: " << natteMassadichtheid
         << "kN/m^3\nmet C_v: " << c_v << "m^2/s\n"
@@ -71,6 +79,8 @@ void Grond::gen_js() {
     js["Naam"] = Naam;
     js["C_v"] = c_v;
     js["k_s"] = k_s;
+    js["Ontlastingsconstante"] = ontlastingsconstante;
+    js["OCR"] = OCR;
     ground_js = js;
 }
 
@@ -183,12 +193,26 @@ void Zettingsberekening::berekenZetting() {
                     effectieveSpanningOpZ +=
                         grondlagen[i].natteMassadichtheid * gridSize;
                 }
+                //TODO check dit
                 dDelt_sigma =
                     belastingsType.deltaSig(diepte, xPositie, yPositie);
+                //hieronder. zal altijd false zijn als ocr =1 en ddelt_sigma >0
+                if ((dDelt_sigma + effectieveSpanningOpZ) < 
+                    effectieveSpanningOpZ*grondlagen[i].OCR) {
+                    //deel herbelastingsregio
+                    HOverC = (gridSize) / (grondlagen[i].ontlastingsconstante);
+                }
+                else {
+                    //deel belasting if not overgeconsolideerd
+                    HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
+                }
                 finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
-                HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
+                //als: finalespanning < eerder effectieve: grond rijst
+                // OCR =1 -> geen verandering tov de vlaamse
+                // ocr =1 -> ln(..) nooit <0 -> laag kan nooit stijgen
+                // OCR>1 als  teller < noemer; laag stijgt omhoog
                 lnGedeelte = std::log((finaleSpanningOpZ) /
-                                      (double)effectieveSpanningOpZ);
+                                      (double)(grondlagen[i].OCR*effectieveSpanningOpZ));
                 zettingT = (double)(HOverC * lnGedeelte);
                 laagzetting += zettingT;
                 // stockeer waarden voor latere preview

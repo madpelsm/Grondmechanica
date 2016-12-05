@@ -13,12 +13,15 @@ class Grond {
     int decimalPrecisionInShout = 3;
 public:
     json ground_js;
-    double samendrukkingsCoeff, bovengrens, ondergrens, laagdikte, drogeMassDichtheid,dikteNaPrim,secZetting,
-        primZetting,natteMassadichtheid;
+    double samendrukkingsCoeff, bovengrens, ondergrens, 
+        laagdikte, drogeMassDichtheid,dikteNaPrim,secZetting,
+        primZetting,natteMassadichtheid,OCR=1,ontlastingsconstante=0;
     double e_p = 0, c_alpha = 0, t_p = 1,c_v,k_s;
     std::string Naam;
     std::string Message;
-    Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,float _drogeMassaDichtheid, std::string _Naam,double c_v,double k_s,double _natteMassadichtheid =0);
+    Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
+        float _drogeMassaDichtheid, std::string _Naam,double c_v,
+        double k_s,double _natteMassadichtheid =0,double _OCR=1,double _ontlastingsconstante=1);
     Grond(json grondJS);
     ~Grond();
     std::string shout();
@@ -58,7 +61,7 @@ public:
     json zettingsBerekeningJS;
     std::vector<double>dZettingPrim,dDelta_sigma,dSigma_eff,graphDzetting;
     BelastingsType belastingsType;//bepaal adhv dit de formule voor de belasting
-    double fea,sumPrecision =50,PI=4*atan(1);
+    double fea=0,sumPrecision =50,PI=4*atan(1);
     float  xPositie, yPositie;
     std::vector<Grond> grondlagen;
     ~Zettingsberekening();
