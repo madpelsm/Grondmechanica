@@ -320,6 +320,7 @@ int main(int argc, char * argv[]) {
                 + "mm.\nBerekend met maaswijdte: " << sonderingsPunt[i].getGridSize()<<"m\n********************************\n";
 
         }
+        str << std::endl;
         writeToFile(str.str());
     });
     zettingsGUI->addVariable("Diepte", infoDiepte);
@@ -403,6 +404,7 @@ void updateConfigText(Label * config) {
         strst << "Consolidatiepunt " << sonderingsnummer << " van de " << sonderingsPunt.size() - 1 << ".\n";
         strst << sonderingsPunt[sonderingsnummer].shout();
     }
+    strst << std::endl;
     huidigeConfig = strst.str();
     config->setCaption(huidigeConfig);
 }
