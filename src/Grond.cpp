@@ -203,6 +203,7 @@ void Zettingsberekening::berekenZetting() {
             tot += (double)dZettingPrim[k];
             graphDzetting[dZettingPrim.size() - 1 - k] = tot;
         }
+        totalePrimaireZetting = tot;
         done = true;
     }
 }
