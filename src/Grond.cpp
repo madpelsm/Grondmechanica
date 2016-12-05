@@ -198,9 +198,8 @@ void Zettingsberekening::berekenZetting() {
             grondlagen[i].primZetting = laagzetting;
         }
         double tot = 0;
-        graphDzetting.resize(dZettingPrim.size(),
-                             0.0) for (int k = 0; k < dZettingPrim.size();
-                                       k++) {
+        graphDzetting.resize(dZettingPrim.size(), 0.0);
+        for (int k = 0; k < dZettingPrim.size(); k++) {
             tot += (double)dZettingPrim[k];
             graphDzetting[dZettingPrim.size() - 1 - k] = tot;
         }
