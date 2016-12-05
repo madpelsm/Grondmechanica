@@ -54,6 +54,7 @@ class Zettingsberekening {
     std::string message;
     int decimalPrecisionInShout = 3;
 public:
+    bool done = false;
     json zettingsBerekeningJS;
     std::vector<double>dZettingPrim,dDelta_sigma,dSigma_eff,graphDzetting;
     BelastingsType belastingsType;//bepaal adhv dit de formule voor de belasting
@@ -84,4 +85,5 @@ public:
     double getZettingNaT(double t);//using real time [s]
     double getTimeToConsolidationDegree(double U);//use fraction of U;
     double getDrainageLength(Grond &onder, Grond &huidig, Grond &boven);
+    void setPosition(double xCons, double yCons);
 };
