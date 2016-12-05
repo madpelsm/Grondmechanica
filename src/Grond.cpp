@@ -155,11 +155,13 @@ void Zettingsberekening::berekenZetting() {
         dDelta_sigma.clear();
         graphDzetting.clear();
         int num_elements = 0;
-        for (int i = 0; i < grondlagen.size(); ++i) {
+        /*for (int i = 0; i < grondlagen.size(); ++i) {
             num_elements +=
                 std::ceil(grondlagen[i].laagdikte / (double)gridSize);
             num_elements++;
-        }
+        }*/
+        num_elements = std::ceil((grondlagen[0].bovengrens -
+            grondlagen.back().ondergrens) / (double)gridSize);
         dZettingPrim.reserve(num_elements);
         dSigma_eff.reserve(num_elements);
         dDelta_sigma.reserve(num_elements);
@@ -204,6 +206,7 @@ void Zettingsberekening::berekenZetting() {
             graphDzetting[dZettingPrim.size() - 1 - k] = tot;
         }
         totalePrimaireZetting = tot;
+
         done = true;
     }
 }
@@ -235,7 +238,12 @@ std::string Zettingsberekening::shout() {
     return out.str();
 }
 
-void Zettingsberekening::setGridSize(float _gridSize) { gridSize = _gridSize; }
+void Zettingsberekening::setGridSize(float _gridSize) { 
+    if (_gridSize != gridSize) {
+        gridSize = _gridSize;
+        done = false;
+    }
+}
 
 float Zettingsberekening::getOpDiepte(float diepte,
                                       std::vector<double> &DiepteInfo) {
@@ -349,6 +357,7 @@ double Zettingsberekening::getDrainageLength(Grond &onder, Grond &huidig,
 void Zettingsberekening::setPosition(double xCons, double yCons) {
     xPositie = (xCons);
     yPositie = (yCons);
+    done = false;
     gen_msg();
 }
 
@@ -360,7 +369,10 @@ BelastingsType::BelastingsType(json js) {
     qs = js["qs"].get<double>();
     type = js["type"].get<int>();
     if (type == 0) {
-        typeNaam = "uniforme plaat last";
+        typeNaam = "Uniforme plaat last";
+    }
+    else if (type == 1) {
+        typeNaam = "Uniforme strip last";
     }
 
     belastingsBreedte = std::abs(x2 - x1);

@@ -96,16 +96,25 @@ int main(int argc, char * argv[]) {
         sonderingsPunt.clear();
         updateConfigText(config);
     });
-    removeAllGUI->addButton("remove specified",[&screen, &config]() {
-        sonderingsPunt.erase(sonderingsPunt.begin()+sonderingsnummer);
-        updateConfigText(config);
+    removeAllGUI->addButton("remove selected",[&screen, &config]() {
+        std::stringstream str;
+        if (sonderingsnummer < sonderingsPunt.size()) {
+            str << "Punt " << sonderingsnummer << " werd verwijderd" << std::endl;
+            sonderingsPunt.erase(sonderingsPunt.begin() + sonderingsnummer);
+            updateConfigText(config);
+        }
+        else {
+            str << "Punt zit niet in de lijst" << std::endl;
+        }
+        MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Warning, "Punt verwijwderd", str.str(), "ok");
+        str.clear();
     });
 
 
     //GUI build
     sonderingGUI->addGroup("Locatie")->setTooltip("Plaats waar we de zetting zullen berekenen.");
     sonderingGUI->addVariable("Zettingspunt", sonderingsnummer)->setTooltip(
-            "Dit is het punt waar we de zetting in zullen berekenen, dit kan op de plaats van een sondering of een boring zijn.");
+            "Het punt waarin we de configuratie aan het bewerken zijn.");
     sonderingGUI->addVariable("X positie [m]", xPos)->setTooltip("De plaats in de richting van de breedte van de last");
     sonderingGUI->addVariable("Y Positie [m]", yPos);
     sonderingGUI->addVariable("Freatisch oppervlak hoogte [m]", feaHoogte);
@@ -144,7 +153,7 @@ int main(int argc, char * argv[]) {
     belastingGUI->addVariable("Eindpositie van de last", eindPosLast);
     belastingGUI->addVariable("Grote van de last [kN/m^3]", lastGrootte);
     belastingGUI->addVariable("Kies belastingsgeval", loadType, enabled)->setItems(
-        { "Plaat belasting","Point load","Line load" });
+        { "Plaat last","Uniforme strip","Puntlast" });
     belastingGUI->addButton("Maak last aan", [&screen,&config]() {
         genereerLast(beginPosLast, eindPosLast, lastGrootte, loadType, screen);
         updateConfigText(config);
