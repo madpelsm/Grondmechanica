@@ -29,20 +29,16 @@ enum InfoOpDiepteTypes {
 //variable declarations
 
 float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
-int windowMargin = 2;
+int windowMargin = 5;
 bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
 xPos, yPos = 0, sonderingsnummer, feaHoogte, natteMassadichtheid,
 beginPosLast, eindPosLast, lastGrootte,c_v=0.0,k_s=0.0,tijd=999999;
-int belastingID = 0;//de locatie van de belasting in de vector met belastingstypes
 int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort",huidigeConfig="";
-InfoOpDiepteTypes diepteInfoType = Zetting;
 test_enum loadType = uniformPlateLoad;
 Color grond_kleur_graph(0.543f,0.269f,0.0742f, 1.f);
 std::vector<Zettingsberekening> sonderingsPunt;
-std::vector<BelastingsType> belastingstypes;
-
 //function identifiers
 void addSolidLayerToSondering(double bovengrens, double ondergrens, 
         double samendrukkingsconstante, double drogemassadichtheid, 
@@ -57,7 +53,7 @@ std::string makeSaveFile(std::vector<Zettingsberekening> &e);
 void readFromFile();
 void updateGraph(VectorXf &func, VectorXf &sigma_eff_val, VectorXf &dSigm_val, VectorXf &dZetting_val);
 std::vector<std::string> split(const std::string &s, char delim);
-
+void updateConfigText(Label * config);
 int main(int argc, char * argv[]) {
     nanogui::init();
     Screen *screen = new Screen(Vector2i(WIDTH, HEIGHT), "Zettingsberekening",true,false,8,8,24,8,2);
@@ -71,23 +67,40 @@ int main(int argc, char * argv[]) {
     ref<Window> window2 = grondGUI->addWindow(Eigen::Vector2i(WIDTH/3.1, windowMargin), "Grond");
     
     FormHelper *sonderingGUI = new FormHelper(screen);
-    ref<Window> window1 = sonderingGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 50), "Sonderingsinformatie");
+    ref<Window> window1 = sonderingGUI->addWindow(Eigen::Vector2i(WIDTH / 1.43, windowMargin), "Sonderingsinformatie");
 
     FormHelper *zettingsGUI = new FormHelper(screen);
-    ref<Window> window4 = zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 1.9), "Zettingen");
+    ref<Window> window4 = zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 2.02), "Zettingen");
     
     FormHelper * consolidationForm = new FormHelper(screen);
-    Window* consolidationWindow = consolidationForm->addWindow(Eigen::Vector2i(WIDTH/16, HEIGHT/3.1), "Consolidation point mover");
+    Window* consolidationWindow = consolidationForm->addWindow(Eigen::Vector2i(WIDTH/16, HEIGHT/3.2), "Consolidation point mover");
     
     Window *w = new Window(screen, "Graph");
     int wW = 400, wH = 200;
-    w->setPosition(Eigen::Vector2i(WIDTH/4, HEIGHT/1.8));
+    w->setPosition(Eigen::Vector2i(WIDTH/4, HEIGHT/1.78));
     w->setFixedWidth(wW);
     w->setVisible(true);
 
     Window * configurationWindow = new Window(screen, "Huidige configuratie");
     configurationWindow->setLayout(new GroupLayout());
-    configurationWindow->setPosition(Eigen::Vector2i(WIDTH / 1.5-5, HEIGHT / 2.1));
+    configurationWindow->setPosition(Eigen::Vector2i(WIDTH / 1.5-5, HEIGHT / 2.05));
+    VScrollPanel * scroll = new VScrollPanel(configurationWindow);
+    scroll->setFixedSize(Eigen::Vector2i(300, 300));
+    Label * config = new Label(scroll, "Geen configuratie geladen");
+    config->setFixedSize(Eigen::Vector2i(300, HEIGHT / 2));
+
+    FormHelper * removeAllGUI = new FormHelper(screen);
+    Window * removeWindow = removeAllGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 210), "Remove");
+    removeAllGUI->addVariable("zettingsberekeningspunt", sonderingsnummer);
+    removeAllGUI->addButton("remove all", [&screen,&config]() {
+        sonderingsPunt.clear();
+        updateConfigText(config);
+    });
+    removeAllGUI->addButton("remove specified",[&screen, &config]() {
+        sonderingsPunt.erase(sonderingsPunt.begin()+sonderingsnummer);
+        updateConfigText(config);
+    });
+
 
     //GUI build
     sonderingGUI->addGroup("Locatie")->setTooltip("Plaats waar we de zetting zullen berekenen.");
@@ -96,8 +109,10 @@ int main(int argc, char * argv[]) {
     sonderingGUI->addVariable("X positie [m]", xPos)->setTooltip("De plaats in de richting van de breedte van de last");
     sonderingGUI->addVariable("Y Positie [m]", yPos);
     sonderingGUI->addVariable("Freatisch oppervlak hoogte [m]", feaHoogte);
-    sonderingGUI->addButton("Maak zettingspunt aan", [&screen]() {
+    sonderingGUI->addButton("Maak zettingspunt aan", [&screen,&config]() {
+
         genereerSonderingsPunt(sonderingsnummer, xPos, yPos, feaHoogte, loadType, screen);
+        updateConfigText(config);
 
     });
 
@@ -117,10 +132,11 @@ int main(int argc, char * argv[]) {
     grondGUI->addVariable("Doorlatendheidsfactor", k_s);
 
     grondGUI->addGroup("Bevestig");
-    grondGUI->addButton("Voeg grondlaag toe", [&screen]() {
+    grondGUI->addButton("Voeg grondlaag toe", [&screen,&config]() {
         addSolidLayerToSondering(bovengrens, ondergrens,
             samendrukkingsconstante, drogeMassadichtheid,
             grondnaam, sonderingsnummer, screen,c_v,k_s, natteMassadichtheid);
+        updateConfigText(config);
     });
 
     belastingGUI->addGroup("Belasting");
@@ -129,8 +145,9 @@ int main(int argc, char * argv[]) {
     belastingGUI->addVariable("Grote van de last [kN/m^3]", lastGrootte);
     belastingGUI->addVariable("Kies belastingsgeval", loadType, enabled)->setItems(
         { "Plaat belasting","Point load","Line load" });
-    belastingGUI->addButton("Maak last aan", [&screen]() {
+    belastingGUI->addButton("Maak last aan", [&screen,&config]() {
         genereerLast(beginPosLast, eindPosLast, lastGrootte, loadType, screen);
+        updateConfigText(config);
     })->setTooltip("Klik om de last aan te maken");
 
     TabWidget * graphTabs = new TabWidget(w);
@@ -214,9 +231,10 @@ int main(int argc, char * argv[]) {
     w->setLayout(new GridLayout(Orientation::Horizontal, 1, Alignment::Fill, 0, 0));
     graphTabs->setActiveTab(0);
 
+    zettingsGUI->addVariable("Multithreading", multithreaded);
     zettingsGUI->addVariable("Maasbreedte [m]", gridSize)->setTooltip(
             "Kies de nauwkeurigheid waarmee gerekend moet worden, kleinere waarden zorgen wel voor een langere rekentijd.");
-    zettingsGUI->addButton("Calculate", [&screen, &func, &graph,&sigma_eff_val,&dSigm_val,&dZetting_val]() {
+    zettingsGUI->addButton("Calculate", [&screen, &func, &graph,&sigma_eff_val,&dSigm_val,&dZetting_val,&config]() {
         std::ostringstream str;
         sonderingsPunt.size();
         str << "Onvolledige invoer :(";
@@ -254,32 +272,26 @@ int main(int argc, char * argv[]) {
             str << "Berekend in " << dur << "s\n" << std::endl;
             updateGraph(func,sigma_eff_val,dSigm_val,dZetting_val);
             
-            str.clear();
+            
 
         }
-        MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Information, "De zettingen", 
-            str.str(), "OK", "Cancel");
+        config->setCaption(str.str());
+        str.clear();
+        //MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Information, "De zettingen", 
+        //    str.str(), "OK", "Cancel");
     })->setTooltip("Zorg dat je zeker correcte input leverde.");
     zettingsGUI->addButton("Save", [&screen]() {
         MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Information, "Write status",
             writeToFile(makeSaveFile(sonderingsPunt)), "ok");
        
     });
-    zettingsGUI->addButton("Load", []() {
+    zettingsGUI->addButton("Load", [&config]() {
         readFromFile();
+        updateConfigText(config);
     });
-    VScrollPanel * scroll = new VScrollPanel(configurationWindow);
-    scroll->setFixedSize(Eigen::Vector2i(300, 300));
-    Label * config = new Label(scroll, "Huidige configuratie");
-    config->setFixedSize(Eigen::Vector2i(300, HEIGHT/2));
-    zettingsGUI->addButton("Toon huidige configuratie", [&screen,&zettingsGUI,&config]() {
-        std::ostringstream strst;
-        if (sonderingsnummer < sonderingsPunt.size()) {
-            strst << "Consolidatiepunt " << sonderingsnummer << " van de " << sonderingsPunt.size()-1 << ".\n";
-            strst<<sonderingsPunt[sonderingsnummer].shout();
-        }
-        huidigeConfig = strst.str();
-        config->setCaption(huidigeConfig);
+    
+    zettingsGUI->addButton("Toon huidige configuratie", [&config]() {
+        updateConfigText(config);
         })->setTooltip("Beschrijving van de grondlagen.");
 
     zettingsGUI->addButton("Export", []() {
@@ -294,7 +306,6 @@ int main(int argc, char * argv[]) {
         }
         writeToFile(str.str());
     });
-
     zettingsGUI->addVariable("Diepte", infoDiepte);
     zettingsGUI->addVariable("Tijd [s]", tijd);
     zettingsGUI->addButton("Geef info op diepte", [&screen]() {
@@ -327,14 +338,14 @@ int main(int argc, char * argv[]) {
     consolidationForm->refresh();
     consolidationForm->addVariable("X ", xCons);
     consolidationForm->addVariable("Y ", yCons);
-    consolidationForm->addButton("submit ", [&xCons,&yCons,&screen]() {
+    consolidationForm->addButton("submit ", [&xCons,&yCons,&screen,&config]() {
         if (sonderingsnummer < sonderingsPunt.size()) {
             std::ostringstream msg_str;
             msg_str << "Consolidation point moved from " << std::setprecision(pointPrecisionInDialog) <<
                 sonderingsPunt[sonderingsnummer].xPositie << "," << sonderingsPunt[sonderingsnummer].yPositie <<
                 " to " << xCons << "," << yCons << "\n in Consolidation point "<<sonderingsnummer<<"." << std::endl;
-            sonderingsPunt[sonderingsnummer].xPositie = xCons;
-            sonderingsPunt[sonderingsnummer].yPositie = yCons;
+            sonderingsPunt[sonderingsnummer].setPosition(xCons, yCons);
+            updateConfigText(config);
             MessageDialog * m = new MessageDialog(screen, MessageDialog::Type::Information, "Succes", msg_str.str(), "OK");
         }
         else {
@@ -349,8 +360,6 @@ int main(int argc, char * argv[]) {
     screen->performLayout();
 
     nanogui::mainloop();
-
-
     nanogui::shutdown();
     return 0;
 }
@@ -369,47 +378,61 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens, double samen
     }
 }
 
+void updateConfigText(Label * config) {
+    std::ostringstream strst;
+    if (sonderingsnummer < sonderingsPunt.size()) {
+        strst << "Consolidatiepunt " << sonderingsnummer << " van de " << sonderingsPunt.size() - 1 << ".\n";
+        strst << sonderingsPunt[sonderingsnummer].shout();
+    }
+    huidigeConfig = strst.str();
+    config->setCaption(huidigeConfig);
+}
+
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte, test_enum enumval, 
     Screen * screen) {
-    if (enumval < belastingstypes.size()) {
-        // 1 belasting per keer. indien een nieuwe uniforme striplast -> overschrijf de vorige
-        belastingstypes[enumval] = (BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
-        MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Belasting aangemaakt", belastingstypes[enumval].shout(), "OK", "Cancel", false);
-    }
-    else if (enumval != 0) {
-        MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Warning, "Belasting aangemaakt", "Het gekozen belastingstype wordt nog niet ondersteund", "OK", "Cancel", false);
 
+    if (sonderingsnummer < sonderingsPunt.size()) {
+        sonderingsPunt[sonderingsnummer].wijzigBelastingsType(BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
+        std::ostringstream str;
+        str << "Belasting aangemaakt in " << sonderingsnummer << "." << std::endl;
+        MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, str.str(), sonderingsPunt[sonderingsnummer].belastingsType.shout(), "OK", "Cancel", false);
     }
-    else{
-        belastingstypes.push_back(BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
-        MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Belasting aangemaakt", belastingstypes[enumval].shout(), "OK", "Cancel", false);
+    //if (enumval < belastingstypes.size()) {
+    //    // 1 belasting per keer. indien een nieuwe uniforme striplast -> overschrijf de vorige
+    //    belastingstypes[enumval] = (BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
+    //    MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Belasting aangemaakt", belastingstypes[enumval].shout(), "OK", "Cancel", false);
+    //}
+    //else if (enumval != 0) {
+    //    MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Warning, "Belasting aangemaakt", "Het gekozen belastingstype wordt nog niet ondersteund", "OK", "Cancel", false);
 
-    }
+    //}
+    //else{
+    //    belastingstypes.push_back(BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
+    //    MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Belasting aangemaakt", belastingstypes[enumval].shout(), "OK", "Cancel", false);
+
+    //}
+    //if (sonderingsnummer < sonderingsPunt.size()) {
+    //    sonderingsPunt[sonderingsnummer].belastingsType = belastingstypes[enumval];
+    //}
 }
 
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos, double feaHoogte, 
     test_enum enumval, Screen * screen) {
-
-    if (enumval < belastingstypes.size()) {
         if (sonderingsnummer == sonderingsPunt.size() ) {
             //dan nieuwe aanmaken
-            sonderingsPunt.push_back(Zettingsberekening(belastingstypes[enumval], xPos, yPos));
+            sonderingsPunt.push_back(Zettingsberekening(BelastingsType(beginPosLast,eindPosLast,lastGrootte,enumval), xPos, yPos));
             sonderingsPunt[sonderingsnummer].fea = feaHoogte;
             MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Zettingsberekeningspunt aangemaakt", sonderingsPunt[sonderingsnummer].shout(), "OK", "Cancel", false);
-
         }
-        else if ((sonderingsnummer) < sonderingsPunt.size()) {
-            sonderingsPunt[sonderingsnummer] = (Zettingsberekening(belastingstypes[enumval], xPos, yPos));
-            sonderingsPunt[sonderingsnummer].fea = feaHoogte;
+        else if (sonderingsnummer < sonderingsPunt.size()) {
+            sonderingsPunt[sonderingsnummer] = Zettingsberekening(BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval), xPos, yPos);
             MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Zettingsberekeningspunt aangemaakt", sonderingsPunt[sonderingsnummer].shout(), "OK", "Cancel", false);
         }
         else {
-            MessageDialog *m = new MessageDialog(screen, MessageDialog::Type::Warning, "Oeps!", "De zettingsberekeningspunten dienen in een opeenvolgende volgorde ingevoerd te worden. Eg. eerst 0, dan 1, dan 2, enz..");
+            MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Warning, "Zettingsberekeningspunt niet aangemaakt", "foutief rangnummer", "OK", "Cancel", false);
+
         }
-    }
-    else {
-        MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Warning, "er is nog geen belastingstype aangemaakt", "Gelieve eerst een belastingstype aan te maken", "OK", "Cancel", false);
-    }
+
 }
 std::string writeToFile(std::string fileContent) {
 
@@ -452,7 +475,7 @@ void readFromFile() {
         std::vector<json> inputVectors = inputJS["zettingsberekingspunten"].get<std::vector<json>>();
         for (int i = 0; i < inputVectors.size(); i++) {
             sonderingsPunt.push_back(Zettingsberekening(inputVectors[i]));
-            belastingstypes.push_back(sonderingsPunt[i].belastingsType);
+            //belastingstypes.push_back(sonderingsPunt[i].belastingsType);
         }
     }
 }

@@ -37,7 +37,7 @@ Grond::Grond(json grondJS){
 void Grond::gen_msg() {
     std::ostringstream str;
 
-    str << "Grondlaag " << Naam << ", samendrukkingscoefficient C= " <<
+    str << "Grondlaag " << Naam << "\nsamendrukkingscoefficient C= " <<
         std::setprecision(decimalPrecisionInShout) << samendrukkingsCoeff <<
         " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout) << (bovengrens)
         << "m tot " << std::setprecision(decimalPrecisionInShout) << (ondergrens) <<
@@ -97,6 +97,7 @@ Zettingsberekening::Zettingsberekening(json js){
     yPositie = js["y"].get<double>();
     zettingsBerekeningJS = js;
     gen_msg();
+    done = false;
 }
 
 
@@ -107,6 +108,7 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType,float _xPo
     yPositie = _yPos;
     gen_js();
     gen_msg();
+    done = false;
 }
 
 void Zettingsberekening::gen_js(){
@@ -129,6 +131,7 @@ Zettingsberekening::Zettingsberekening(BelastingsType _belastingsType, float _xP
     xPositie = _xPos;
     yPositie = 0;
     gen_msg();
+    done = false;
 
 }
 
@@ -149,50 +152,54 @@ void Zettingsberekening::addGrondlaag(Grond g)
 {
     grondlagen.push_back(g);
     message += g.shout()+"\n";
+    done = false;
 }
 
 void Zettingsberekening::berekenZetting()
 {
-    dZettingPrim.clear();
-    dSigma_eff.clear();
-    dDelta_sigma.clear();
-    graphDzetting.clear();
-    double effectieveSpanningOpZ = 0;
-    double diepte = 0;
-    double totZetting = 0;
-    double dDelt_sigma = 0;
-    double finaleSpanningOpZ = 0, HOverC=0, lnGedeelte=0, zettingT=0;
-    for (int i = 0; i < grondlagen.size(); i++) {
-        double j = 0;
-        double laagzetting = 0;
-        while((j+(double)gridSize)<grondlagen[i].laagdikte){
-            diepte += gridSize;
-            if ((grondlagen[i].bovengrens - j) < fea) {
-                effectieveSpanningOpZ += grondlagen[i].drogeMassDichtheid*gridSize;
+    if (!done) {
+        dZettingPrim.clear();
+        dSigma_eff.clear();
+        dDelta_sigma.clear();
+        graphDzetting.clear();
+        double effectieveSpanningOpZ = 0;
+        double diepte = 0;
+        double totZetting = 0;
+        double dDelt_sigma = 0;
+        double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
+        for (int i = 0; i < grondlagen.size(); i++) {
+            double j = 0;
+            double laagzetting = 0;
+            while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
+                diepte += gridSize;
+                if ((grondlagen[i].bovengrens - j) < fea) {
+                    effectieveSpanningOpZ += grondlagen[i].drogeMassDichtheid*gridSize;
+                }
+                else {
+                    effectieveSpanningOpZ += grondlagen[i].natteMassadichtheid*gridSize;
+                }
+                dDelt_sigma = belastingsType.deltaSig(diepte, xPositie, yPositie);
+                finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
+                HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
+                lnGedeelte = std::log((finaleSpanningOpZ) / (double)effectieveSpanningOpZ);
+                zettingT = (double)(HOverC*lnGedeelte);
+                laagzetting += zettingT;
+                //stockeer waarden voor latere preview
+                dZettingPrim.push_back(zettingT);
+                dDelta_sigma.push_back(dDelt_sigma);
+                dSigma_eff.push_back(effectieveSpanningOpZ);
+                j = j + gridSize;
             }
-            else {
-                effectieveSpanningOpZ += grondlagen[i].natteMassadichtheid*gridSize;
-            }
-            dDelt_sigma = belastingsType.deltaSig(diepte, xPositie,yPositie);
-            finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
-            HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
-            lnGedeelte = std::log( (finaleSpanningOpZ) / (double)effectieveSpanningOpZ);
-            zettingT = (double)(HOverC*lnGedeelte);
-            laagzetting += zettingT;
-            //stockeer waarden voor latere preview
-            dZettingPrim.push_back(zettingT);
-            dDelta_sigma.push_back(dDelt_sigma);
-            dSigma_eff.push_back(effectieveSpanningOpZ);
-            j = j + gridSize;
+            grondlagen[i].primZetting = laagzetting;
         }
-        grondlagen[i].primZetting = laagzetting;
+        double tot = 0;
+        for (int k = 0; k < dZettingPrim.size(); k++) {
+            tot += (double)dZettingPrim[k];
+            graphDzetting.insert(graphDzetting.begin(), tot);
+        }
+        totalePrimaireZetting = tot;
+        done = true;
     }
-    double tot = 0;
-    for (int k = 0; k < dZettingPrim.size(); k++) {
-        tot += (double)dZettingPrim[k];
-        graphDzetting.insert(graphDzetting.begin(), tot);
-    }
-    totalePrimaireZetting = tot;
 }
 
 void Zettingsberekening::berekenSecZetting(){
@@ -206,7 +213,8 @@ void Zettingsberekening::berekenSecZetting(){
 
 void Zettingsberekening::wijzigBelastingsType(BelastingsType b)
 {
-    belastingsType = b;
+    belastingsType = b; gen_msg();
+    done = false;   
 }
 
 double Zettingsberekening::getTotaleZetting()
@@ -344,6 +352,12 @@ double Zettingsberekening::getDrainageLength(Grond & onder, Grond & huidig, Gron
     }
 
     return huidig.laagdikte*factor;
+}
+
+void Zettingsberekening::setPosition(double xCons, double yCons){
+    xPositie = (xCons);
+    yPositie = (yCons);
+    gen_msg();
 }
 
 
