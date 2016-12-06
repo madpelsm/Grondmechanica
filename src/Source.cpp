@@ -14,8 +14,8 @@ using namespace nanogui;
 
 enum test_enum {
     uniformPlateLoad = 0,
-    PuntLast = 1,
-    LijnLast = 2
+    UniformStrip = 1,
+    CircularLoad = 2
 };
 
 enum InfoOpDiepteTypes {
@@ -156,11 +156,12 @@ int main(int argc, char * argv[]) {
     });
 
     belastingGUI->addGroup("Belasting");
-    belastingGUI->addVariable("Beginpositie van de last", beginPosLast);
-    belastingGUI->addVariable("Eindpositie van de last", eindPosLast);
+    belastingGUI->addVariable("Begin positie van de last", beginPosLast)
+        ->setTooltip("Bij plaat is dit de breedte in X richting, bij uniforme de begin positie, bij circular Rx van de circkelstraal");
+    belastingGUI->addVariable("Eind positie van de last", eindPosLast)->setTooltip("Bij plaat is dit de breedte in Y richting, bij uniforme de eind positie, bij circular Ry van de circkelstraal");
     belastingGUI->addVariable("Grote van de last [kN/m^3]", lastGrootte);
     belastingGUI->addVariable("Kies belastingsgeval", loadType, enabled)->setItems(
-        { "Plaat last","Uniforme strip","Puntlast" });
+        { "Plaat last","Uniforme Strip","Circular Load" });
     belastingGUI->addButton("Maak last aan", [&screen,&config]() {
         genereerLast(beginPosLast, eindPosLast, lastGrootte, loadType, screen);
         updateConfigText(config);
@@ -445,7 +446,7 @@ void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos, doub
         if (sonderingsnummer == sonderingsPunt.size() ) {
             //dan nieuwe aanmaken
             sonderingsPunt.push_back(Zettingsberekening(BelastingsType(beginPosLast,eindPosLast,lastGrootte,enumval), xPos, yPos));
-            sonderingsPunt[sonderingsnummer].fea = feaHoogte;
+            sonderingsPunt[sonderingsnummer].setPhea(feaHoogte);
             MessageDialog* m = new MessageDialog(screen, MessageDialog::Type::Information, "Zettingsberekeningspunt aangemaakt", sonderingsPunt[sonderingsnummer].shout(), "OK", "Cancel", false);
         }
         else if (sonderingsnummer < sonderingsPunt.size()) {

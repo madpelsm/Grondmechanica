@@ -11,6 +11,9 @@ Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
       c_v(c_v), k_s(k_s),
       natteMassadichtheid(_nattemassadichtheid),
       OCR(_OCR),ontlastingsconstante(_ontlastingsconstante){
+    if (samendrukkingsCoeff == 0) {
+        samendrukkingsCoeff = 0.0000000001;
+    }
     if (natteMassadichtheid == 0) {
         natteMassadichtheid = drogeMassDichtheid * 1.1;
     }
@@ -101,6 +104,7 @@ Zettingsberekening::Zettingsberekening(json js) {
     }
     xPositie = js["x"].get<double>();
     yPositie = js["y"].get<double>();
+    fea = js["fea"].get<double>();
     zettingsBerekeningJS = js;
     gen_msg();
     done = false;
@@ -126,6 +130,7 @@ void Zettingsberekening::gen_js() {
     js["grondlagen"] = grondlagen_js;
     js["x"] = xPositie;
     js["y"] = yPositie;
+    js["fea"] = fea;
     zettingsBerekeningJS = js;
 }
 
@@ -186,12 +191,13 @@ void Zettingsberekening::berekenZetting() {
             double laagzetting = 0;
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
                 diepte += gridSize;
+                //als onder water
                 if ((grondlagen[i].bovengrens - j) < fea) {
                     effectieveSpanningOpZ +=
-                        grondlagen[i].drogeMassDichtheid * gridSize;
+                        (grondlagen[i].natteMassadichtheid-waterGewicht) * gridSize;
                 } else {
                     effectieveSpanningOpZ +=
-                        grondlagen[i].natteMassadichtheid * gridSize;
+                        (grondlagen[i].drogeMassDichtheid) * gridSize;
                 }
                 //TODO check dit
                 dDelt_sigma =
@@ -255,6 +261,12 @@ void Zettingsberekening::wijzigBelastingsType(BelastingsType b) {
 }
 
 double Zettingsberekening::getTotaleZetting() { return totalePrimaireZetting; }
+
+void Zettingsberekening::setPhea(double _fea){
+    fea = _fea;
+    gen_msg();
+    gen_js();
+}
 
 std::string Zettingsberekening::shout() {
     std::ostringstream out;
@@ -398,6 +410,10 @@ BelastingsType::BelastingsType(json js) {
     else if (type == 1) {
         typeNaam = "Uniforme strip last";
     }
+    else if (type == 2) {
+        typeNaam = "uniform circular load";
+        r = sqrt(x1*x1 + x2*x2);
+    }
 
     belastingsBreedte = std::abs(x2 - x1);
     initialised = true;
@@ -413,7 +429,13 @@ BelastingsType::BelastingsType(float _x1, float _x2, float _qs, int _typeLast)
     if (_typeLast == 0) {
         typeNaam = "uniforme plaat last";
     }
-
+    else if (_typeLast == 1) {
+        typeNaam = "uniforme strip belasting";
+    }
+    else if (_typeLast == 2) {
+        r = sqrt(x1*x1 + x2*x2);
+        typeNaam = "uniform circular load";
+    }
     belastingsBreedte = std::abs(x2 - x1);
     initialised = true;
     gen_js();
@@ -510,7 +532,15 @@ float BelastingsType::deltaSig(float z, float xPositie, float yPositie) {
         }
     }
 
+    if (type == 2 && initialised) {
+        delta_sigma = sigma_circular_load(z, r);
+    }
     return delta_sigma;
+}
+
+double BelastingsType::sigma_circular_load(double z,double r) {
+    double I0 = 1 - pow((1 / (1 + pow((r / z), 2))), 1.5);
+    return qs*I0;
 }
 
 void BelastingsType::gen_js() {
@@ -524,12 +554,20 @@ void BelastingsType::gen_js() {
 
 std::string BelastingsType::shout() {
     std::ostringstream out;
+    if (type == 0) {
+        out << "Belasting:\n diagonaal (0,0)->("
+            << std::setprecision(decimalPrecisionInShout) << x1 << ","
+            << std::setprecision(decimalPrecisionInShout) << x2 << ") [m]";
+    }
+    else if (type == 1) {
+        out << "van" << x1 << "tot" << x2;
+    }
+    else if (type == 2) {
+        out << "met belastingsstraal" << sqrt(pow(x1, 2) + pow(x2, 2));
+    }
 
-    out << "Belasting:\n diagonaal (0,0)->("
-        << std::setprecision(decimalPrecisionInShout) << x1 << ","
-        << std::setprecision(decimalPrecisionInShout) << x2 << ") [m]\ngrootte "
-        << std::setprecision(decimalPrecisionInShout) << (qs)
-        << "kN/m^2 \nType " << typeNaam << std::endl;
+    out<<"\ngrootte "<< std::setprecision(decimalPrecisionInShout) << (qs)
+    << "kN/m^2 \nType " << typeNaam << std::endl;
     return out.str();
 }
 

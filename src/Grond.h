@@ -39,6 +39,7 @@ public:
     json belastingsTypeJS;
     float sigma_fin, sigmaZ_0;
     float belastingsBreedte, qs, pi = 4*atan(1), x1, x2;
+    double r = 1;
     int type = 0;//type 0 : uniforme strip
 
     BelastingsType();
@@ -48,6 +49,8 @@ public:
     void gen_js();
     std::string shout();
     double sigma_plate_load(double L, double B, double z);
+
+    double sigma_circular_load(double z, double r);
 };
 
 
@@ -61,7 +64,7 @@ public:
     json zettingsBerekeningJS;
     std::vector<double>dZettingPrim,dDelta_sigma,dSigma_eff,graphDzetting;
     BelastingsType belastingsType;//bepaal adhv dit de formule voor de belasting
-    double fea=0,sumPrecision =50,PI=4*atan(1);
+    double fea = 0, sumPrecision = 50, PI = 4 * atan(1), waterGewicht = 9.81;
     float  xPositie, yPositie;
     std::vector<Grond> grondlagen;
     ~Zettingsberekening();
@@ -76,6 +79,7 @@ public:
     void berekenSecZetting();
     void wijzigBelastingsType(BelastingsType b);
     double getTotaleZetting();
+    void setPhea(double fea);
     std::string shout();
     void setGridSize(float _gridSize);
     float getOpDiepte(float diepte, std::vector<double>& DiepteInfo);//bevat een vector de info van een param op verschillende dieptes
