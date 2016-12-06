@@ -30,14 +30,14 @@ Grond::Grond(json grondJS) {
     Naam = grondJS["Naam"].get<std::string>();
     natteMassadichtheid = grondJS["natteMassadichtheid"].get<double>();
     // natteMassadichtheid = drogeMassDichtheid;
-    c_v = (grondJS["C_v"].get<double>() < 0.00000000001)
+    c_v = (grondJS["C_v"].get<double>() < 0.00000000000000001)
               ? 0
               : grondJS["C_v"].get<double>();
-    k_s = (grondJS["k_s"].get<double>() < 0.00000000001)
+    k_s = (grondJS["k_s"].get<double>() < 0.0000000000000001)
               ? 0
               : grondJS["k_s"].get<double>();
     //protect against division by 0
-    ontlastingsconstante = (grondJS["Ontlastingsconstante"].get<double>()<0.000001)?
+    ontlastingsconstante = (grondJS["Ontlastingsconstante"].get<double>()<0.00000000000000001)?
         1 : grondJS["Ontlastingsconstante"].get<double>();
     OCR = (grondJS["OCR"].get<double>()<1)?1:grondJS["OCR"].get<double>();
     laagdikte = std::abs(bovengrens - ondergrens);
