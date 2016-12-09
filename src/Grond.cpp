@@ -212,11 +212,8 @@ void Zettingsberekening::berekenZetting() {
                     //deel belasting if not overgeconsolideerd
                     HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
                 }
-                finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
-                //als: finalespanning < eerder effectieve: grond rijst
-                // OCR =1 -> geen verandering tov de vlaamse
-                // ocr =1 -> ln(..) nooit <0 -> laag kan nooit stijgen
-                // OCR>1 als  teller < noemer; laag stijgt omhoog
+                finaleSpanningOpZ = grondlagen[i].OCR*effectieveSpanningOpZ + dDelt_sigma;
+                //in ln : verhoogde op heersende 
                 lnGedeelte = std::log((finaleSpanningOpZ) /
                                       (double)(grondlagen[i].OCR*effectieveSpanningOpZ));
                 zettingT = (double)(HOverC * lnGedeelte);
