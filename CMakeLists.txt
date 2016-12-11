@@ -29,9 +29,18 @@ file(GLOB GRONDMECHANICA_HDR_FILES "./src/*.h")
 
 ADD_EXECUTABLE(Grondmechanica ${GRONDMECHANICA_SRC_FILES} ${GRONDMECHANICA_HDR_FILES} ${OPENGL_LIBRARIES}) 
 
+if(UNIX AND NOT APPLE)
+    set(LINUX TRUE)
+endif()
+
 IF(WIN32)
-target_link_libraries(Grondmechanica ${PROJECT_SOURCE_DIR}/dep/nanogui.lib)
+    set(NANOGUI_LIB "${PROJECT_SOURCE_DIR}/dep/nanogui.lib")
 ELSE()
-target_link_libraries(Grondmechanica ${PROJECT_SOURCE_DIR}/ext/nanogui/build/libnanogui.so)
+    if (LINUX)
+        set(NANOGUI_LIB "${PROJECT_SOURCE_DIR}/ext/nanogui/build/libnanogui.so")
+    ELSE ()
+        set(NANOGUI_LIB "${PROJECT_SOURCE_DIR}/ext/nanogui/build/libnanogui.dylib")
+    ENDIF()
 ENDIF()
 
+target_link_libraries(Grondmechanica ${NANOGUI_LIB})
