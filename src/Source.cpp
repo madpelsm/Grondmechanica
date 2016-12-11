@@ -292,7 +292,6 @@ int main(int argc, char *argv[]) {
                 str << "Onvolledige invoer :(";
                 if (!sonderingsPunt.empty()) {
                     str = std::ostringstream();
-/bin/bash: s: command not found
                     std::clock_t timer;
                     timer = std::clock();
                     double dur;
