@@ -222,8 +222,8 @@ void Zettingsberekening::berekenZetting() {
             double j = 0;
             double laagzetting = 0;
             // TODO: find the layer with the lowest s_u , this is the weakest
-            // this layer is above aanzetshoogte
-            // so it's upper limit will be above aanzetshoogte
+            // this is at least from the aanzetshoogte, downward. until a
+            // certain depth has been reached. needs to check this
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
                 diepte += gridSize;
                 // als onder water
