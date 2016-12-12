@@ -17,13 +17,15 @@ class Grond {
     double samendrukkingsCoeff, bovengrens, ondergrens, laagdikte,
         drogeMassDichtheid, dikteNaPrim, secZetting, primZetting,
         natteMassadichtheid, OCR = 1, ontlastingsconstante = 0;
+    double c = 0, c_a = 0, phi = 0, phi_a = 0;
     double e_p = 0, c_alpha = 0, t_p = 1, c_v, k_s;
     std::string Naam;
     std::string Message;
     Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
           float _drogeMassaDichtheid, std::string _Naam, double c_v, double k_s,
           double _natteMassadichtheid = 0, double _OCR = 1,
-          double _ontlastingsconstante = 1);
+          double _ontlastingsconstante = 1, double c = 0, double c_a = 0,
+          double phi = 0, double phi_a = 0);
     Grond(json grondJS);
     ~Grond();
     std::string shout();

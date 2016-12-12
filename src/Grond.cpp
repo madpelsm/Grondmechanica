@@ -3,7 +3,8 @@
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
              float _drogeMassaDichtheid, std::string _Naam, double c_v,
              double k_s = 0.0, double _nattemassadichtheid, double _OCR,
-             double _ontlastingsconstante)
+             double _ontlastingsconstante, double _c, double _c_a, double _phi,
+             double _phi_a)
     : samendrukkingsCoeff(_samendrukkingscoeff),
       bovengrens(_bovengrens),
       Naam(_Naam),
@@ -13,7 +14,11 @@ Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
       k_s(k_s),
       natteMassadichtheid(_nattemassadichtheid),
       OCR(_OCR),
-      ontlastingsconstante(_ontlastingsconstante) {
+      ontlastingsconstante(_ontlastingsconstante),
+      c(_c),
+      c_a(_c_a),
+      phi(_phi),
+      phi_a(_phi_a) {
     if (samendrukkingsCoeff == 0) {
         samendrukkingsCoeff = 0.0000000001;
     }
@@ -48,6 +53,18 @@ Grond::Grond(json grondJS) {
             ? 1
             : grondJS["Ontlastingsconstante"].get<double>();
     OCR = (grondJS["OCR"].get<double>() < 1) ? 1 : grondJS["OCR"].get<double>();
+    if (grondJS.find("c") != grondJS.end()) {
+        c = grondJS["c"].get<double>();
+    }
+    if (grondJS.find("c_a") != grondJS.end()) {
+        c_a = grondJS["c_a"].get<double>();
+    }
+    if (grondJS.find("phi") != grondJS.end()) {
+        phi = grondJS["phi"].get<double>();
+    }
+    if (grondJS.find("phi_a") != grondJS.end()) {
+        phi_a = grondJS["phi_a"].get<double>();
+    }
     laagdikte = std::abs(bovengrens - ondergrens);
     // ground_js = grondJS;
     gen_js();
@@ -67,7 +84,9 @@ void Grond::gen_msg() {
         << std::setprecision(decimalPrecisionInShout) << (drogeMassDichtheid)
         << "kN/m^3\nNatte massadichtheid: " << natteMassadichtheid
         << "kN/m^3\nmet C_v: " << c_v << "m^2/s\n"
-        << "Doorlatendheid: " << k_s << "m/s\n";
+        << "Doorlatendheid: " << k_s << "m/s\n"
+        << "c: " << c << "phi: " << phi << "c': " << c_a << "phi': " << phi_a;
+    str << std::endl;
     Message = str.str();
     str.clear();
 }
@@ -89,6 +108,10 @@ void Grond::gen_js() {
     js["k_s"] = k_s;
     js["Ontlastingsconstante"] = ontlastingsconstante;
     js["OCR"] = OCR;
+    js["c"] = c;
+    js["phi"] = phi;
+    js["phi_a"] = phi_a;
+    js["c_a"] = c_a;
     ground_js = js;
 }
 
