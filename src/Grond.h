@@ -40,6 +40,7 @@ class BelastingsType {
     int decimalPrecisionInShout = 3;
 
    public:
+    double aanzetshoogte = 0;
     json belastingsTypeJS;
     float sigma_fin, sigmaZ_0;
     float belastingsBreedte, qs, pi = 4 * atan(1), x1, x2;
@@ -48,13 +49,14 @@ class BelastingsType {
 
     BelastingsType();
     BelastingsType(json js);
-    BelastingsType(float x1, float x2, float _qs, int _typeLast);
+    BelastingsType(float x1, float x2, float _qs, int _typeLast,
+                   double _aanzet = 0);
     float deltaSig(float z, float x, float yPos = 0);
     void gen_js();
     std::string shout();
     double sigma_plate_load(double L, double B, double z);
-
     double sigma_circular_load(double z, double r);
+    void setAanzetshoogte(double z);
 };
 
 class Zettingsberekening {
@@ -70,6 +72,7 @@ class Zettingsberekening {
     BelastingsType
         belastingsType;  // bepaal adhv dit de formule voor de belasting
     double fea = 0, sumPrecision = 50, PI = 4 * atan(1), waterGewicht = 9.81;
+    double q_u_ESA = 0, q_u_TSA = 0;  // evenwichtsdraagvermogen
     float xPositie, yPositie;
     std::vector<Grond> grondlagen;
     ~Zettingsberekening();
@@ -103,4 +106,6 @@ class Zettingsberekening {
     double getTimeToConsolidationDegree(double U);  // use fraction of U;
     double getDrainageLength(Grond &onder, Grond &huidig, Grond &boven);
     void setPosition(double xCons, double yCons);
+    double calculateq_u(double c, double phi);
+    double getSU(double c, double phi, double sigma);
 };

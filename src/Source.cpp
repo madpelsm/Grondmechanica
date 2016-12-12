@@ -27,9 +27,9 @@ float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
 int windowMargin = 5;
 bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
-    xPos, yPos = 0, sonderingsnummer, feaHoogte, natteMassadichtheid,
-          beginPosLast, eindPosLast, lastGrootte, c_v = 0.0, k_s = 0.0,
-          tijd = 999999, OCR = 1, ontlastingsconstante = 1;
+    aanzetshoogte = 0, xPos, yPos = 0, sonderingsnummer, feaHoogte,
+    natteMassadichtheid, beginPosLast, eindPosLast, lastGrootte, c_v = 0.0,
+    k_s = 0.0, tijd = 999999, OCR = 1, ontlastingsconstante = 1;
 double c = 0, c_a = 0, phi = 0, phi_a = 0;
 int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort", huidigeConfig = "";
@@ -45,7 +45,7 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
                               double _OCR, double _ontlastingsconstante,
                               double c, double phi, double c_a, double phi_a);
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
-                  test_enum enumval, Screen *screen);
+                  test_enum enumval, double aanzet, Screen *screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
                             double feaHoogte, test_enum enumval,
                             Screen *screen);
@@ -79,8 +79,9 @@ int main(int argc, char *argv[]) {
         zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 2.02), "Zettingen");
 
     FormHelper *consolidationForm = new FormHelper(screen);
-    Window *consolidationWindow = consolidationForm->addWindow(
-        Eigen::Vector2i(WIDTH / 16, HEIGHT / 3.2), "Consolidation point mover");
+    Window *consolidationWindow =
+        consolidationForm->addWindow(Eigen::Vector2i(WIDTH / 16, HEIGHT / 3.17),
+                                     "Consolidation point mover");
 
     Window *w = new Window(screen, "Graph");
     int wW = 400, wH = 200;
@@ -117,7 +118,7 @@ int main(int argc, char *argv[]) {
         }
         MessageDialog *m =
             new MessageDialog(screen, MessageDialog::Type::Warning,
-                              "Punt verwijwderd", str.str(), "ok");
+                              "Punt verwijderd", str.str(), "ok");
         str.clear();
     });
 
@@ -160,10 +161,10 @@ int main(int argc, char *argv[]) {
     grondGUI->addVariable("Natte massadichtheid kN/m^3", natteMassadichtheid);
     grondGUI->addVariable("C_v", c_v);
     grondGUI->addVariable("Doorlatendheidsfactor", k_s);
-    grondGUI->addVariable("c ", c);
-    grondGUI->addVariable("phi ", phi);
-    grondGUI->addVariable("c'", c_a);
-    grondGUI->addVariable("phi'", phi_a);
+    grondGUI->addVariable("c ", c)->setTooltip("for TSA, i.e. undrained");
+    grondGUI->addVariable("phi ", phi)->setTooltip("for TSA, i.e. undrained");
+    grondGUI->addVariable("c'", c_a)->setTooltip("for ESA, i.e. drained");
+    grondGUI->addVariable("phi'", phi_a)->setTooltip("for ESA, i.e. drained");
     grondGUI->addButton("Voeg grondlaag toe", [&screen, &config]() {
         if (OCR > 1 && ontlastingsconstante == 0) {
             MessageDialog *m = new MessageDialog(
@@ -191,11 +192,12 @@ int main(int argc, char *argv[]) {
     belastingGUI->addVariable("Grote van de last [kN/m^3]", lastGrootte);
     belastingGUI->addVariable("Kies belastingsgeval", loadType, enabled)
         ->setItems({"Plaat last", "Uniforme Strip", "Circular Load"});
+    belastingGUI->addVariable("aanzetshoogte [m]", aanzetshoogte);
     belastingGUI
         ->addButton("Maak last aan",
                     [&screen, &config]() {
                         genereerLast(beginPosLast, eindPosLast, lastGrootte,
-                                     loadType, screen);
+                                     loadType, aanzetshoogte, screen);
                         updateConfigText(config);
                     })
         ->setTooltip("Klik om de last aan te maken");
@@ -462,12 +464,13 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
                               double drogemassadichtheid, std::string grondnaam,
                               int sondering, Screen *screen, double c_v,
                               double k_s, double natteMassadichtheid,
-                              double _OCR, double _ontlastingsconstante,double c,double phi, double c_a,double phi_a) {
+                              double _OCR, double _ontlastingsconstante,
+                              double c, double phi, double c_a, double phi_a) {
     if ((sondering) < sonderingsPunt.size()) {
         sonderingsPunt[sondering].addGrondlaag(
             Grond(samendrukkingsconstante, bovengrens, ondergrens,
                   drogemassadichtheid, grondnaam, c_v, k_s, natteMassadichtheid,
-                  _OCR, _ontlastingsconstante,c,phi,c_a,phi_a));
+                  _OCR, _ontlastingsconstante, c, phi, c_a, phi_a));
         std::string t =
             sonderingsPunt[sondering]
                 .grondlagen[sonderingsPunt[sondering].grondlagen.size() - 1]
@@ -500,11 +503,11 @@ void updateConfigText(Label *config) {
 }
 
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
-                  test_enum enumval, Screen *screen) {
+                  test_enum enumval, double aanzet, Screen *screen) {
     std::ostringstream str;
     if (sonderingsnummer < sonderingsPunt.size()) {
-        sonderingsPunt[sonderingsnummer].wijzigBelastingsType(
-            BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval));
+        sonderingsPunt[sonderingsnummer].wijzigBelastingsType(BelastingsType(
+            beginPosLast, eindPosLast, lastGrootte, enumval, aanzet));
         str << "Belasting gewijzigd in " << sonderingsnummer << "."
             << std::endl;
     } else {

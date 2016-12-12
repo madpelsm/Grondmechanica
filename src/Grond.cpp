@@ -215,9 +215,15 @@ void Zettingsberekening::berekenZetting() {
         double totZetting = 0;
         double dDelt_sigma = 0;
         double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
+        // placeholder for c and phi, find the lowest s_u
+        double ESA_c_minimal = 0, ESA_phi_minimal = 0, TSA_phi_minimal = 0,
+               TSA_c_minimal = 0;
         for (int i = 0; i < grondlagen.size(); i++) {
             double j = 0;
             double laagzetting = 0;
+            // TODO: find the layer with the lowest s_u , this is the weakest
+            // this layer is above aanzetshoogte
+            // so it's upper limit will be above aanzetshoogte
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
                 diepte += gridSize;
                 // als onder water
@@ -339,22 +345,24 @@ float Zettingsberekening::getGridSize() { return gridSize; }
 
 double Zettingsberekening::Consolidatiegraad(double Tv) {
     double U = 0;
-    bool uselessiteration = true;
-    if (!uselessiteration) {
+    bool iterationMethod = false;
+    if (!iterationMethod) {
         if (Tv < 0.2827433389) {
             U = 2 * sqrt(PI * Tv) / PI;
         } else if (Tv >= 0.2827433389) {
             U = -0.01 * exp(-2.467936863 * Tv + 4.395395553) + 1;
         }
     }
-    U = 1;
-    double M = 0, expPart = 0, T2 = 0;
-    for (double m = 0; m < sumPrecision; m++) {
-        M = std::pow(0.5 * PI * (2.0 * m + 1), 2);
-        expPart = std::exp(-M * Tv);
-        T2 += (2 / M) * expPart;
+    if (iterationMethod) {
+        U = 1;
+        double M = 0, expPart = 0, T2 = 0;
+        for (double m = 0; m < sumPrecision; m++) {
+            M = std::pow(0.5 * PI * (2.0 * m + 1), 2);
+            expPart = std::exp(-M * Tv);
+            T2 += (2 / M) * expPart;
+        }
+        U -= T2;
     }
-    U -= T2;
     return U;
 }
 
@@ -427,6 +435,11 @@ void Zettingsberekening::setPosition(double xCons, double yCons) {
 
 BelastingsType::BelastingsType() {}
 
+void BelastingsType::setAanzetshoogte(double z) {
+    aanzetshoogte = z;
+    gen_js();
+}
+
 BelastingsType::BelastingsType(json js) {
     x1 = js["x1"].get<double>();
     x2 = js["x2"].get<double>();
@@ -440,13 +453,17 @@ BelastingsType::BelastingsType(json js) {
         typeNaam = "uniform circular load";
         r = sqrt(x1 * x1 + x2 * x2);
     }
+    if (js.find("aanzetshoogte") != js.end()) {
+        aanzetshoogte = js["aanzetshoogte"].get<double>();
+    }
 
     belastingsBreedte = std::abs(x2 - x1);
     initialised = true;
     belastingsTypeJS = js;
 }
 
-BelastingsType::BelastingsType(float _x1, float _x2, float _qs, int _typeLast)
+BelastingsType::BelastingsType(float _x1, float _x2, float _qs, int _typeLast,
+                               double _aanzet)
     : x1(_x1), x2(_x2), qs(_qs), type(_typeLast) {
     // breedte in m
     // qs is de blasting in kN/m^3
@@ -460,6 +477,7 @@ BelastingsType::BelastingsType(float _x1, float _x2, float _qs, int _typeLast)
         r = sqrt(x1 * x1 + x2 * x2);
         typeNaam = "uniform circular load";
     }
+    aanzetshoogte = _aanzet;
     belastingsBreedte = std::abs(x2 - x1);
     initialised = true;
     gen_js();
@@ -573,6 +591,7 @@ void BelastingsType::gen_js() {
     js["x2"] = x2;
     js["qs"] = qs;
     js["type"] = type;
+    js["aanzetshoogte"] = aanzetshoogte;
     belastingsTypeJS = js;
 }
 
@@ -589,7 +608,8 @@ std::string BelastingsType::shout() {
     }
 
     out << "\ngrootte " << std::setprecision(decimalPrecisionInShout) << (qs)
-        << "kN/m^2 \nType " << typeNaam << std::endl;
+        << "kN/m^2 \nType " << typeNaam
+        << "\nAanzetshoogte[m]: " << aanzetshoogte << std::endl;
     return out.str();
 }
 
@@ -601,4 +621,46 @@ double BelastingsType::sigma_plate_load(double L, double B, double z) {
         qs / (2 * pi) * (atan(L * B / (z * R3)) +
                          L * B * z / R3 * (1 / pow(R1, 2) + 1 / pow(R2, 2)));
     return s;
+}
+
+double Zettingsberekening::calculateq_u(double c, double phi) {
+    // variables for function of q_u
+    double d_q = 1, d_c = 1;
+    // conversion from degrees to radians
+    double p_t = getOpDiepte(belastingsType.aanzetshoogte, dSigma_eff);
+
+    double tnPhi = std::tan(phi / ((double)180) * PI);
+    double s_q = 1;
+    double s_g = 1;
+    double s_c = 1;
+    double N_q =
+        std::exp(p_t * tnPhi) * std::tan(PI / 4.0 + phi / 180.0 / 2 * PI);
+
+    double alpha = N_q - 1;
+    if (belastingsType.x2 != 0 && belastingsType.type == 0 &&
+        belastingsType.x1 != 0) {
+        if (belastingsType.x1 / belastingsType.x2 <= 5) {
+            // x2 is in y, x1 in x
+            s_q = 1 + belastingsType.x2 / belastingsType.x1 * sin(phi);
+            s_c = (s_q * N_q - 1) / alpha;
+            s_g = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
+        }
+    }
+    double N_c = 0;
+    if (phi != 0) {
+        N_c = alpha / tnPhi;
+    }
+    double N_g = 2 * alpha * tnPhi;
+
+    double g_k = 0;
+
+    double B = belastingsType.x1;  // since i used x1 in s_q
+
+    // Function itself
+    return d_q * s_q * N_q * p_t + d_c * s_c * N_c * c +
+           s_g * N_g * g_k * B / 2;
+}
+
+double Zettingsberekening::getSU(double c, double phi, double sigma) {
+    return c + sigma * std::tan(phi);
 }
