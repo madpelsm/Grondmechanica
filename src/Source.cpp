@@ -515,6 +515,7 @@ void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
             beginPosLast, eindPosLast, lastGrootte, enumval, aanzet));
         str << "Belasting gewijzigd in " << sonderingsnummer << "."
             << std::endl;
+        sonderingsPunt[sonderingsnummer].done = false;
     } else {
         str << "gelieve eerst een punt aan te maken" << std::endl;
     }
@@ -522,33 +523,6 @@ void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
         new MessageDialog(screen, MessageDialog::Type::Information, "Belasting",
                           str.str(), "OK", "Cancel", false);
     str.clear();
-    // if (enumval < belastingstypes.size()) {
-    //    // 1 belasting per keer. indien een nieuwe uniforme striplast ->
-    //    overschrijf de vorige
-    //    belastingstypes[enumval] = (BelastingsType(beginPosLast, eindPosLast,
-    //    lastGrootte, enumval));
-    //    MessageDialog* m = new MessageDialog(screen,
-    //    MessageDialog::Type::Information, "Belasting aangemaakt",
-    //    belastingstypes[enumval].shout(), "OK", "Cancel", false);
-    //}
-    // else if (enumval != 0) {
-    //    MessageDialog* m = new MessageDialog(screen,
-    //    MessageDialog::Type::Warning, "Belasting aangemaakt", "Het gekozen
-    //    belastingstype wordt nog niet ondersteund", "OK", "Cancel", false);
-
-    //}
-    // else{
-    //    belastingstypes.push_back(BelastingsType(beginPosLast, eindPosLast,
-    //    lastGrootte, enumval));
-    //    MessageDialog* m = new MessageDialog(screen,
-    //    MessageDialog::Type::Information, "Belasting aangemaakt",
-    //    belastingstypes[enumval].shout(), "OK", "Cancel", false);
-
-    //}
-    // if (sonderingsnummer < sonderingsPunt.size()) {
-    //    sonderingsPunt[sonderingsnummer].belastingsType =
-    //    belastingstypes[enumval];
-    //}
 }
 
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
@@ -648,7 +622,7 @@ void updateGraph(VectorXf &func, VectorXf &sigma_eff_val, VectorXf &dSigm_val,
              i < sonderingsPunt[sonderingsnummer].dZettingPrim.size(); i++) {
             dZetting_val[i] = graphScale *
                               sonderingsPunt[sonderingsnummer].dZettingPrim[i] /
-                              sonderingsPunt[sonderingsnummer].dZettingPrim[0];
+                              sonderingsPunt[sonderingsnummer].maxZettingT;
             dSigm_val[i] = graphScale *
                            sonderingsPunt[sonderingsnummer].dDelta_sigma[i] /
                            sonderingsPunt[sonderingsnummer].dDelta_sigma[0];

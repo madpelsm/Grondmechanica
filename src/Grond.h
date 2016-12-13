@@ -72,7 +72,7 @@ class Zettingsberekening {
     BelastingsType
         belastingsType;  // bepaal adhv dit de formule voor de belasting
     double fea = 0, sumPrecision = 50, PI = 4 * atan(1), waterGewicht = 9.81;
-    double q_u_ESA = 0, q_u_TSA = 0;  // evenwichtsdraagvermogen
+    double q_u_ESA = 0, q_u_TSA = 0,maxZettingT=0.000001;  // evenwichtsdraagvermogen
     float xPositie, yPositie;
     std::vector<Grond> grondlagen;
     ~Zettingsberekening();

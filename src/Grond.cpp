@@ -208,8 +208,16 @@ void Zettingsberekening::berekenZetting() {
             (double)gridSize);
         dZettingPrim.reserve(num_elements);
         dSigma_eff.reserve(num_elements);
+        double num_elements2 =
+            num_elements -
+            (grondlagen.front().bovengrens - belastingsType.aanzetshoogte) /
+                ((double)gridSize);
         dDelta_sigma.reserve(num_elements);
 
+        double sigma_eff_op_aanzet = 0;
+        bool corrected = false;
+
+        maxZettingT = 0.00000001;
         double effectieveSpanningOpZ = 0;
         double diepte = 0;
         double totZetting = 0;
@@ -228,7 +236,7 @@ void Zettingsberekening::berekenZetting() {
             // remove false when you want this to be activated
             // search till depth : aanzetshoogte - ??? is reached
             if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
-                false) {
+                true) {
                 // this might be wrong, the way s_u gets calculated p.e.
                 // TSA su
                 if (s_u_TSA >
@@ -257,8 +265,26 @@ void Zettingsberekening::berekenZetting() {
                         (grondlagen[i].drogeMassDichtheid) * gridSize;
                 }
                 // TODO check dit
-                dDelt_sigma =
-                    belastingsType.deltaSig(diepte, xPositie, yPositie);
+                if ((grondlagen.front().bovengrens - diepte) <=
+                    belastingsType.aanzetshoogte) {
+                    if (!corrected) {
+                        sigma_eff_op_aanzet = effectieveSpanningOpZ;
+                        corrected = true;
+                    }
+                    dDelt_sigma =
+                        belastingsType.deltaSig(
+                            diepte -
+                                (((grondlagen.front().bovengrens -
+                                      belastingsType.aanzetshoogte)) < 0
+                                        ? 0
+                                        : grondlagen.front().bovengrens -
+                                              belastingsType.aanzetshoogte),
+                            xPositie, yPositie) /
+                        belastingsType.qs *
+                        (belastingsType.qs - sigma_eff_op_aanzet);
+
+                    dDelta_sigma.push_back(dDelt_sigma);
+                }
                 // hieronder. zal altijd false zijn als ocr =1 en ddelt_sigma >0
                 if ((dDelt_sigma + effectieveSpanningOpZ) <
                     effectieveSpanningOpZ * grondlagen[i].OCR) {
@@ -277,8 +303,11 @@ void Zettingsberekening::berekenZetting() {
                 zettingT = (double)(HOverC * lnGedeelte);
                 laagzetting += zettingT;
                 // stockeer waarden voor latere preview
-                dZettingPrim.push_back(zettingT);
-                dDelta_sigma.push_back(dDelt_sigma);
+                if (zettingT != 0) {
+                    maxZettingT =
+                        (zettingT > maxZettingT) ? zettingT : maxZettingT;
+                    dZettingPrim.push_back(zettingT);
+                }
                 dSigma_eff.push_back(effectieveSpanningOpZ);
                 j = j + gridSize;
             }
