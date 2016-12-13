@@ -217,6 +217,7 @@ void Zettingsberekening::berekenZetting() {
         double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
         // placeholder for c and phi, find the lowest s_u
         double ESA_c_minimal = 0, ESA_phi_minimal = 0, TSA_phi_minimal = 0,
+               s_u_TSA = 999999999999999, s_u_ESA = 9999999999999,
                TSA_c_minimal = 0;
         for (int i = 0; i < grondlagen.size(); i++) {
             double j = 0;
@@ -224,6 +225,25 @@ void Zettingsberekening::berekenZetting() {
             // TODO: find the layer with the lowest s_u , this is the weakest
             // this is at least from the aanzetshoogte, downward. until a
             // certain depth has been reached. needs to check this
+            // remove false when you want this to be activated
+            if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
+                false) {
+                //this might be wrong, the way s_u gets calculated p.e.
+                // TSA su
+                if (s_u_TSA >
+                    getSU(grondlagen[i].c, grondlagen[i].phi, diepte)) {
+                    s_u_TSA = getSU(grondlagen[i].c, grondlagen[i].phi, diepte);
+                    TSA_c_minimal = grondlagen[i].c;
+                    TSA_phi_minimal = grondlagen[i].phi;
+                }
+                if (s_u_ESA >
+                    getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte)) {
+                    s_u_ESA =
+                        getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte);
+                    ESA_c_minimal = grondlagen[i].c_a;
+                    ESA_phi_minimal = grondlagen[i].phi_a;
+                }
+            }
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
                 diepte += gridSize;
                 // als onder water
