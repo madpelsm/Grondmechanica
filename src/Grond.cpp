@@ -216,9 +216,9 @@ void Zettingsberekening::berekenZetting() {
         double dDelt_sigma = 0;
         double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
         // placeholder for c and phi, find the lowest s_u
-        double ESA_c_minimal = 0, ESA_phi_minimal = 0, TSA_phi_minimal = 0,
-               s_u_TSA = 999999999999999, s_u_ESA = 9999999999999,
-               TSA_c_minimal = 0;
+        double ESA_c_minimal = 0, ESA_phi_minimal = 0.00001,
+               TSA_phi_minimal = 0.0001, s_u_TSA = 999999999999999,
+               s_u_ESA = 9999999999999, TSA_c_minimal = 0;
         for (int i = 0; i < grondlagen.size(); i++) {
             double j = 0;
             double laagzetting = 0;
@@ -226,9 +226,10 @@ void Zettingsberekening::berekenZetting() {
             // this is at least from the aanzetshoogte, downward. until a
             // certain depth has been reached. needs to check this
             // remove false when you want this to be activated
+            // search till depth : aanzetshoogte - ??? is reached
             if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
                 false) {
-                //this might be wrong, the way s_u gets calculated p.e.
+                // this might be wrong, the way s_u gets calculated p.e.
                 // TSA su
                 if (s_u_TSA >
                     getSU(grondlagen[i].c, grondlagen[i].phi, diepte)) {
@@ -283,6 +284,8 @@ void Zettingsberekening::berekenZetting() {
             }
             grondlagen[i].primZetting = laagzetting;
         }
+        q_u_ESA = calculateq_u(ESA_c_minimal, ESA_phi_minimal);
+        q_u_TSA = calculateq_u(TSA_c_minimal, TSA_phi_minimal);
         double tot = 0;
         graphDzetting.resize(dZettingPrim.size(), 0.0);
         for (int k = 0; k < dZettingPrim.size(); k++) {

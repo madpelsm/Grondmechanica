@@ -329,7 +329,10 @@ int main(int argc, char *argv[]) {
                             << std::to_string(
                                    sonderingsPunt[i].getTotaleZetting()) +
                                    "m.\nBerekend met maaswijdte: "
-                            << sonderingsPunt[i].getGridSize() << "m\n\n";
+                            << sonderingsPunt[i].getGridSize() << "m\n"
+                            << "ESA: " << sonderingsPunt[i].q_u_ESA
+                            << "kPa TSA: " << sonderingsPunt[i].q_u_TSA
+                            << "kPa\n";
                     }
 
                     dur = (std::clock() - timer) / ((double)CLOCKS_PER_SEC);
@@ -371,7 +374,9 @@ int main(int argc, char *argv[]) {
                 << std::to_string(sonderingsPunt[i].getTotaleZetting()) +
                        "mm.\nBerekend met maaswijdte: "
                 << sonderingsPunt[i].getGridSize()
-                << "m\n********************************\n";
+                << "m\nESA: " << sonderingsPunt[i].q_u_ESA
+                << "kPa TSA: " << sonderingsPunt[i].q_u_TSA
+                << "kPa\n********************************\n";
         }
         str << std::endl;
         writeToFile(str.str());
