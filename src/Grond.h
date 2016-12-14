@@ -25,7 +25,7 @@ class Grond {
           float _drogeMassaDichtheid, std::string _Naam, double c_v, double k_s,
           double _natteMassadichtheid = 0, double _OCR = 1,
           double _ontlastingsconstante = 1, double c = 999, double c_a = 999,
-          double phi = 0, double phi_a = 0);
+          double phi = 0, double phi_a = 0,double _c_alpha = 0);
     Grond(json grondJS);
     ~Grond();
     std::string shout();
@@ -72,7 +72,9 @@ class Zettingsberekening {
     BelastingsType
         belastingsType;  // bepaal adhv dit de formule voor de belasting
     double fea = 0, sumPrecision = 50, PI = 4 * atan(1), waterGewicht = 9.81;
-    double q_u_ESA = 0, q_u_TSA = 0,maxZettingT=0.000001;  // evenwichtsdraagvermogen
+    double q_u_ESA = 0, q_u_TSA = 0,
+           maxZettingT = 0.000001;  // evenwichtsdraagvermogen
+    double tot_sec_zetting = 0;
     float xPositie, yPositie;
     std::vector<Grond> grondlagen;
     ~Zettingsberekening();

@@ -4,7 +4,7 @@ Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
              float _drogeMassaDichtheid, std::string _Naam, double c_v,
              double k_s = 0.0, double _nattemassadichtheid, double _OCR,
              double _ontlastingsconstante, double _c, double _c_a, double _phi,
-             double _phi_a)
+             double _phi_a, double _c_alpha)
     : samendrukkingsCoeff(_samendrukkingscoeff),
       bovengrens(_bovengrens),
       Naam(_Naam),
@@ -18,7 +18,8 @@ Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
       c(_c),
       c_a(_c_a),
       phi(_phi),
-      phi_a(_phi_a) {
+      phi_a(_phi_a),
+      c_alpha(_c_alpha) {
     if (samendrukkingsCoeff == 0) {
         samendrukkingsCoeff = 0.0000000001;
     }
@@ -65,6 +66,9 @@ Grond::Grond(json grondJS) {
     if (grondJS.find("phi_a") != grondJS.end()) {
         phi_a = grondJS["phi_a"].get<double>();
     }
+    if (grondJS.find("c_alpha") != grondJS.end()) {
+        c_alpha = grondJS["c_alpha"];
+    }
     laagdikte = std::abs(bovengrens - ondergrens);
     // ground_js = grondJS;
     gen_js();
@@ -85,7 +89,8 @@ void Grond::gen_msg() {
         << "kN/m^3\nNatte massadichtheid: " << natteMassadichtheid
         << "kN/m^3\nmet C_v: " << c_v << "m^2/s\n"
         << "Doorlatendheid: " << k_s << "m/s\n"
-        << "c: " << c << "phi: " << phi << "c': " << c_a << "phi': " << phi_a;
+        << "c: " << c << " phi: " << phi << " c': " << c_a
+        << "  phi': " << phi_a << "\nc_alpha: " << c_alpha;
     str << std::endl;
     Message = str.str();
     str.clear();
@@ -112,6 +117,7 @@ void Grond::gen_js() {
     js["phi"] = phi;
     js["phi_a"] = phi_a;
     js["c_a"] = c_a;
+    js["c_alpha"] = c_alpha;
     ground_js = js;
 }
 
@@ -273,12 +279,11 @@ void Zettingsberekening::berekenZetting() {
                     }
                     dDelt_sigma =
                         belastingsType.deltaSig(
-                            diepte -
-                                (((grondlagen.front().bovengrens -
-                                      belastingsType.aanzetshoogte)) < 0
-                                        ? 0
-                                        : grondlagen.front().bovengrens -
-                                              belastingsType.aanzetshoogte),
+                            diepte - (((grondlagen.front().bovengrens -
+                                        belastingsType.aanzetshoogte)) < 0
+                                          ? 0
+                                          : grondlagen.front().bovengrens -
+                                                belastingsType.aanzetshoogte),
                             xPositie, yPositie) /
                         belastingsType.qs *
                         (belastingsType.qs - sigma_eff_op_aanzet);
@@ -313,6 +318,7 @@ void Zettingsberekening::berekenZetting() {
             }
             grondlagen[i].primZetting = laagzetting;
         }
+        //        berekenSecZetting();
         q_u_ESA = calculateq_u(ESA_c_minimal, ESA_phi_minimal);
         q_u_TSA = calculateq_u(TSA_c_minimal, TSA_phi_minimal);
         double tot = 0;
@@ -322,7 +328,6 @@ void Zettingsberekening::berekenZetting() {
             graphDzetting[dZettingPrim.size() - 1 - k] = tot;
         }
         totalePrimaireZetting = tot;
-
         done = true;
     }
 }
@@ -331,12 +336,16 @@ void Zettingsberekening::berekenSecZetting() {
     // TODO: secundaire zetting, check params in grond. Als kan berekend
     // worden-> bereken. anders? Zet dZettingSec in resp vector.
     for (int i = 0; i < grondlagen.size(); i++) {
-        double t = 999999999;  // neem t zeer groot, dit zal de secundaire
-                               // zetting na een lange tijd berekenen, t_p moet
-                               // kleiner zijn dan t
+        double t =
+            9999999999999999;  // neem t zeer groot, dit zal de secundaire
+        // zetting na een lange tijd berekenen, t_p moet
+        // kleiner zijn dan t
+        // find t_p
+        grondlagen[i].getLaagDikteNaPrim();
         grondlagen[i].secZetting =
             grondlagen[i].dikteNaPrim / (1 + grondlagen[i].e_p) *
             grondlagen[i].c_alpha * log(t / grondlagen[i].t_p);
+        tot_sec_zetting += grondlagen[i].secZetting;
     }
 }
 

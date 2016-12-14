@@ -29,7 +29,8 @@ bool multithreaded = true;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
     aanzetshoogte = 0, xPos, yPos = 0, sonderingsnummer, feaHoogte,
     natteMassadichtheid, beginPosLast, eindPosLast, lastGrootte, c_v = 0.0,
-    k_s = 0.0, tijd = 999999, OCR = 1, ontlastingsconstante = 1;
+    k_s = 0.0, tijd = 999999, OCR = 1, ontlastingsconstante = 1,
+    c_alpha1 = 0.00000001;
 double c = 0, c_a = 0, phi = 0, phi_a = 0;
 int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort", huidigeConfig = "";
@@ -43,7 +44,8 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
                               int sondering, Screen *screen, double c_v,
                               double k_s, double natteMassaDichtheid,
                               double _OCR, double _ontlastingsconstante,
-                              double c, double phi, double c_a, double phi_a);
+                              double c, double phi, double c_a, double phi_a,
+                              double c_alpha);
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
                   test_enum enumval, double aanzet, Screen *screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
@@ -165,6 +167,7 @@ int main(int argc, char *argv[]) {
     grondGUI->addVariable("phi ", phi)->setTooltip("for TSA, i.e. undrained");
     grondGUI->addVariable("c'", c_a)->setTooltip("for ESA, i.e. drained");
     grondGUI->addVariable("phi'", phi_a)->setTooltip("for ESA, i.e. drained");
+    grondGUI->addVariable("c_alpha", c_alpha1);
     grondGUI->addButton("Voeg grondlaag toe", [&screen, &config]() {
         if (OCR > 1 && ontlastingsconstante == 0) {
             MessageDialog *m = new MessageDialog(
@@ -175,7 +178,7 @@ int main(int argc, char *argv[]) {
                 bovengrens, ondergrens, samendrukkingsconstante,
                 drogeMassadichtheid, grondnaam, sonderingsnummer, screen, c_v,
                 k_s, natteMassadichtheid, OCR, ontlastingsconstante, c, phi,
-                c_a, phi_a);
+                c_a, phi_a, c_alpha1);
         }
         updateConfigText(config);
     });
@@ -470,7 +473,8 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
                               int sondering, Screen *screen, double c_v,
                               double k_s, double natteMassadichtheid,
                               double _OCR, double _ontlastingsconstante,
-                              double c, double phi, double c_a, double phi_a) {
+                              double c, double phi, double c_a, double phi_a,
+                              double c_alpha) {
     if ((sondering) < sonderingsPunt.size()) {
         sonderingsPunt[sondering].addGrondlaag(
             Grond(samendrukkingsconstante, bovengrens, ondergrens,
