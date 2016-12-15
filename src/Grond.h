@@ -25,7 +25,7 @@ class Grond {
           float _drogeMassaDichtheid, std::string _Naam, double c_v, double k_s,
           double _natteMassadichtheid = 0, double _OCR = 1,
           double _ontlastingsconstante = 1, double c = 999, double c_a = 999,
-          double phi = 0, double phi_a = 0,double _c_alpha = 0);
+          double phi = 0, double phi_a = 0, double _c_alpha = 0);
     Grond(json grondJS);
     ~Grond();
     std::string shout();
@@ -109,5 +109,6 @@ class Zettingsberekening {
     double getDrainageLength(Grond &onder, Grond &huidig, Grond &boven);
     void setPosition(double xCons, double yCons);
     double calculateq_u(double c, double phi);
+    double calc_q_u_TSA(double c, double phi);
     double getSU(double c, double phi, double sigma);
 };

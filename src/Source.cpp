@@ -26,13 +26,14 @@ enum InfoOpDiepteTypes {
 float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
 int windowMargin = 5;
 bool multithreaded = true;
+double freatic2 = 0.0000000123;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
     aanzetshoogte = 0, xPos, yPos = 0, sonderingsnummer, feaHoogte,
     natteMassadichtheid, beginPosLast, eindPosLast, lastGrootte, c_v = 0.0,
     k_s = 0.0, tijd = 999999, OCR = 1, ontlastingsconstante = 1,
     c_alpha1 = 0.00000001;
 double c = 0, c_a = 0, phi = 0, phi_a = 0;
-int WIDTH = 1000, HEIGHT = 700, pointPrecisionInDialog = 5;
+int WIDTH = 1000, HEIGHT = 800, pointPrecisionInDialog = 5;
 std::string grondnaam = "Grondsoort", huidigeConfig = "";
 test_enum loadType = uniformPlateLoad;
 Color grond_kleur_graph(0.543f, 0.269f, 0.0742f, 1.f);
@@ -78,7 +79,7 @@ int main(int argc, char *argv[]) {
 
     FormHelper *zettingsGUI = new FormHelper(screen);
     ref<Window> window4 =
-        zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 2.02), "Zettingen");
+        zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 1.90), "Zettingen");
 
     FormHelper *consolidationForm = new FormHelper(screen);
     Window *consolidationWindow =
@@ -87,7 +88,7 @@ int main(int argc, char *argv[]) {
 
     Window *w = new Window(screen, "Graph");
     int wW = 400, wH = 200;
-    w->setPosition(Eigen::Vector2i(WIDTH / 4, HEIGHT / 1.78));
+    w->setPosition(Eigen::Vector2i(WIDTH / 4, WIDTH * 0.5));
     w->setFixedWidth(wW);
     w->setVisible(true);
 
@@ -102,7 +103,7 @@ int main(int argc, char *argv[]) {
 
     FormHelper *removeAllGUI = new FormHelper(screen);
     Window *removeWindow =
-        removeAllGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 210), "Remove");
+        removeAllGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 225), "Remove");
     removeAllGUI->addVariable("zettingsberekeningspunt", sonderingsnummer);
     removeAllGUI->addButton("remove all", [&screen, &config]() {
         sonderingsPunt.clear();
@@ -334,8 +335,8 @@ int main(int argc, char *argv[]) {
                                    "m.\nBerekend met maaswijdte: "
                             << sonderingsPunt[i].getGridSize() << "m\n"
                             << "ESA: " << sonderingsPunt[i].q_u_ESA
-                            << "kPa TSA: " << sonderingsPunt[i].q_u_TSA
-                            << "kPa\n";
+                            << " kPa TSA: " << sonderingsPunt[i].q_u_TSA
+                            << " kPa\n";
                     }
 
                     dur = (std::clock() - timer) / ((double)CLOCKS_PER_SEC);
@@ -434,17 +435,28 @@ int main(int argc, char *argv[]) {
     consolidationForm->refresh();
     consolidationForm->addVariable("X ", xCons);
     consolidationForm->addVariable("Y ", yCons);
+    consolidationForm->addVariable("FEA [m]", freatic2)
+        ->setTooltip("if this says 1.23e-8, it won't change the phreatic");
     consolidationForm->addButton(
-        "submit ", [&xCons, &yCons, &screen, &config]() {
+        "submit ", [&xCons, &yCons, &config, &screen]() {
             if (sonderingsnummer < sonderingsPunt.size()) {
                 std::ostringstream msg_str;
                 msg_str << "Consolidation point moved from "
                         << std::setprecision(pointPrecisionInDialog)
                         << sonderingsPunt[sonderingsnummer].xPositie << ","
                         << sonderingsPunt[sonderingsnummer].yPositie << " to "
-                        << xCons << "," << yCons << "\n in Consolidation point "
-                        << sonderingsnummer << "." << std::endl;
+                        << xCons << "," << yCons;
                 sonderingsPunt[sonderingsnummer].setPosition(xCons, yCons);
+                if (freatic2 != 0.0000000123) {
+                    sonderingsPunt[sonderingsnummer].setPhea(freatic2);
+                    msg_str << "\nChanged phreatic from"
+                            << sonderingsPunt[sonderingsnummer].fea
+                            << " [m] to " << freatic2 << "m";
+                    freatic2 = 0.0000000123;
+                }
+                msg_str << "\nin Consolidation point " << sonderingsnummer
+                        << "." << std::endl;
+
                 updateConfigText(config);
                 MessageDialog *m =
                     new MessageDialog(screen, MessageDialog::Type::Information,

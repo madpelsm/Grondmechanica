@@ -293,19 +293,25 @@ void Zettingsberekening::berekenZetting() {
                 // hieronder. zal altijd false zijn als ocr =1 en ddelt_sigma >0
                 if ((dDelt_sigma + effectieveSpanningOpZ) <
                     effectieveSpanningOpZ * grondlagen[i].OCR) {
-                    // deel herbelastingsregio
                     HOverC = (gridSize) / (grondlagen[i].ontlastingsconstante);
+                    lnGedeelte =
+                        std::log((dDelt_sigma + effectieveSpanningOpZ) /
+                                 (effectieveSpanningOpZ));
+                    zettingT = (double)(HOverC * lnGedeelte);
+
                 } else {
                     // deel belasting if not overgeconsolideerd
                     HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
+                    lnGedeelte =
+                        std::log((dDelt_sigma + effectieveSpanningOpZ) /
+                                 (effectieveSpanningOpZ * grondlagen[i].OCR));
+
+                    zettingT = (double)(HOverC * lnGedeelte) +
+                               (gridSize / grondlagen[i].ontlastingsconstante) *
+                                   std::log(grondlagen[i].OCR);
                 }
-                finaleSpanningOpZ =
-                    grondlagen[i].OCR * effectieveSpanningOpZ + dDelt_sigma;
+                finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
                 // in ln : verhoogde op heersende
-                lnGedeelte = std::log(
-                    (finaleSpanningOpZ) /
-                    (double)(grondlagen[i].OCR * effectieveSpanningOpZ));
-                zettingT = (double)(HOverC * lnGedeelte);
                 laagzetting += zettingT;
                 // stockeer waarden voor latere preview
                 if (zettingT != 0) {
@@ -320,7 +326,7 @@ void Zettingsberekening::berekenZetting() {
         }
         //        berekenSecZetting();
         q_u_ESA = calculateq_u(ESA_c_minimal, ESA_phi_minimal);
-        q_u_TSA = calculateq_u(TSA_c_minimal, TSA_phi_minimal);
+        q_u_TSA = calc_q_u_TSA(TSA_c_minimal, TSA_phi_minimal);
         double tot = 0;
         graphDzetting.resize(dZettingPrim.size(), 0.0);
         for (int k = 0; k < dZettingPrim.size(); k++) {
@@ -399,7 +405,13 @@ float Zettingsberekening::getEffectieveOpDiepte(float diepte) {
 }
 
 float Zettingsberekening::getDSigmaOpDiepte(float diepte) {
-    return getOpDiepte(diepte, dDelta_sigma);
+    float bovenGrensEersteLaag = 0;
+    if (!grondlagen.empty()) {
+        bovenGrensEersteLaag = grondlagen.front().bovengrens;
+    }
+    return getOpDiepte(
+        (diepte - bovenGrensEersteLaag + belastingsType.aanzetshoogte),
+        dDelta_sigma);
 }
 
 float Zettingsberekening::getGridSize() { return gridSize; }
@@ -724,4 +736,22 @@ double Zettingsberekening::calculateq_u(double c, double phi) {
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {
     return c + sigma * std::tan(phi);
+}
+double Zettingsberekening::calc_q_u_TSA(double c, double phi) {
+    // formule 12.11
+    // q_u = 5.14*s_u*s_c*d_c*i_c*b_c*g_c
+    if (belastingsType.x2 != 0) {
+        // veronderstel geen excentriciteit
+        double s_c = 1 + 0.2 * belastingsType.x2 / ((double)belastingsType.x1);
+        // set d_c =1, is safer, assume layers above are weaker
+        // double d_c =
+        // 1+0.33*std::atan(belastingsType.aanzetshoogte/belastingsType.x2);
+        /*    double d_c = 1; //assume horzontal only
+            double i_c = 1; //asume horizontal only
+            double b_c =1; //assume horizontal only
+            double g_c 1; // assume horizontal only
+            */
+        return 5.14 * c * s_c;
+    } else
+        return 0;
 }
