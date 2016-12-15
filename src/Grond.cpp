@@ -697,41 +697,54 @@ double BelastingsType::sigma_plate_load(double L, double B, double z) {
 }
 
 double Zettingsberekening::calculateq_u(double c, double phi) {
-    // variables for function of q_u
-    double d_q = 1, d_c = 1;
-    // conversion from degrees to radians
-    double p_t = getOpDiepte(belastingsType.aanzetshoogte, dSigma_eff);
-
-    double tnPhi = std::tan(phi / ((double)180) * PI);
-    double s_q = 1;
-    double s_g = 1;
-    double s_c = 1;
+    double phi_inRads = phi / 180 * pi;
+    /*
     double N_q =
-        std::exp(p_t * tnPhi) * std::tan(PI / 4.0 + phi / 180.0 / 2 * PI);
-
-    double alpha = N_q - 1;
-    if (belastingsType.x2 != 0 && belastingsType.type == 0 &&
-        belastingsType.x1 != 0) {
-        if (belastingsType.x1 / belastingsType.x2 <= 5) {
-            // x2 is in y, x1 in x
-            s_q = 1 + belastingsType.x2 / belastingsType.x1 * sin(phi);
-            s_c = (s_q * N_q - 1) / alpha;
-            s_g = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
-        }
+        exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
+    double N_gamma = (N_q - 1) * tan(1.4 * phi_inRads);
+    double s_q = 1;
+    if (belastingsType.x1 != 0) {
+        s_q += belastingsType.x2 / belastingsType.x1 * tan(phi_inRads);
     }
+    double d_q = 1;
+    if (belastingsType.x2 != 0) {
+        d_q = 1 +
+              2 * tan(phi_inRads) * pow(1 - sin(phi_inRads), 2) *
+                  atan(belastingsType.aanzetshoogte / belastingsType.x2);
+    }
+    double s_gamma = 1;
+    if (belastingsType.x1 != 0) {
+        s_gamma -= 0.4 * belastingsType.x2 / belastingsType.x1;
+    }
+    double gamma_eff = getOpDiepte(
+        grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
+        dSigma_eff);
+    double D_gamma =
+        grondlagen.front().bovengrens - belastingsType.aanzetshoogte;
+    double Qu_ESA = gamma_eff * D_gamma * (N_q - 1) * s_q * d_q +
+                    0.5 * gamma_eff * belastingsType.x2 * N_gamma * s_gamma;
+                    */
     double N_c = 0;
-    if (phi != 0) {
-        N_c = alpha / tnPhi;
+    double N_q =
+        exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
+
+    if (phi_inRads != 0) {
+        N_c = (N_q - 1) / tan(phi);
     }
-    double N_g = 2 * alpha * tnPhi;
+    double s_q = 1;
+    double s_gamma = 1;
+    if (belastingsType.x1 != 0) {
+        s_q += belastingsType.x2 / belastingsType.x1 * sin(phi_inRads);
+        s_gamma = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
+    }
+    double s_c = (s_q * N_q - 1) / (N_q - 1);
+    double N_gamma = (N_q - 1) * tan(1.4 * phi_inRads);
+    double gamma_eff = getOpDiepte(
+        grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
+        dSigma_eff);
 
-    double g_k = 0;
-
-    double B = belastingsType.x1;  // since i used x1 in s_q
-
-    // Function itself
-    return d_q * s_q * N_q * p_t + d_c * s_c * N_c * c +
-           s_g * N_g * g_k * B / 2;
+    return s_q * N_q * gamma_eff + N_c * c +
+           s_gamma * N_gamma * gamma_eff * belastingsType.x2 / 2;
 }
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {

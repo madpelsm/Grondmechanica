@@ -491,7 +491,7 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
         sonderingsPunt[sondering].addGrondlaag(
             Grond(samendrukkingsconstante, bovengrens, ondergrens,
                   drogemassadichtheid, grondnaam, c_v, k_s, natteMassadichtheid,
-                  _OCR, _ontlastingsconstante, c, phi, c_a, phi_a));
+                  _OCR, _ontlastingsconstante, c, c_a, phi, phi_a));
         std::string t =
             sonderingsPunt[sondering]
                 .grondlagen[sonderingsPunt[sondering].grondlagen.size() - 1]
