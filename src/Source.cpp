@@ -27,6 +27,7 @@ float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
 int windowMargin = 5;
 bool multithreaded = true;
 double freatic2 = 0.0000000123;
+double laagsteFea = 0, lowestFe= 0.0000000123;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
     aanzetshoogte = 0, xPos, yPos = 0, sonderingsnummer, feaHoogte,
     natteMassadichtheid, beginPosLast, eindPosLast, lastGrootte, c_v = 0.0,
@@ -51,7 +52,7 @@ void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
                   test_enum enumval, double aanzet, Screen *screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
                             double feaHoogte, test_enum enumval,
-                            Screen *screen);
+                            Screen *screen,double fe);
 std::string writeToFile(std::string _content);
 std::string makeSaveFile(std::vector<Zettingsberekening> &e);
 void readFromFile();
@@ -79,11 +80,11 @@ int main(int argc, char *argv[]) {
 
     FormHelper *zettingsGUI = new FormHelper(screen);
     ref<Window> window4 =
-        zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 1.90), "Zettingen");
+        zettingsGUI->addWindow(Eigen::Vector2i(10, HEIGHT / 1.80), "Zettingen");
 
     FormHelper *consolidationForm = new FormHelper(screen);
     Window *consolidationWindow =
-        consolidationForm->addWindow(Eigen::Vector2i(WIDTH / 16, HEIGHT / 3.17),
+        consolidationForm->addWindow(Eigen::Vector2i(WIDTH / 16, HEIGHT / 3.15),
                                      "Consolidation point mover");
 
     Window *w = new Window(screen, "Graph");
@@ -103,7 +104,7 @@ int main(int argc, char *argv[]) {
 
     FormHelper *removeAllGUI = new FormHelper(screen);
     Window *removeWindow =
-        removeAllGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 225), "Remove");
+        removeAllGUI->addWindow(Eigen::Vector2i(WIDTH / 1.4, 245), "Remove");
     removeAllGUI->addVariable("zettingsberekeningspunt", sonderingsnummer);
     removeAllGUI->addButton("remove all", [&screen, &config]() {
         sonderingsPunt.clear();
@@ -135,10 +136,11 @@ int main(int argc, char *argv[]) {
         ->setTooltip("De plaats in de richting van de breedte van de last");
     sonderingGUI->addVariable("Y Positie [m]", yPos);
     sonderingGUI->addVariable("Freatisch oppervlak hoogte [m]", feaHoogte);
+    sonderingGUI->addVariable("Laagste freatisch oppervlak [m]", laagsteFea);
     sonderingGUI->addButton("Maak zettingspunt aan", [&screen, &config]() {
 
         genereerSonderingsPunt(sonderingsnummer, xPos, yPos, feaHoogte,
-                               loadType, screen);
+                               loadType, screen,laagsteFea);
         updateConfigText(config);
 
     });
@@ -405,8 +407,11 @@ int main(int argc, char *argv[]) {
                 << "Spanningsverschil: "
                 << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getDSigmaOpDiepte(
-                       infoDiepte)
-                << "kPa\n"
+                    infoDiepte)
+                << "kPa\nTotale spanning: "
+                << sonderingsPunt[sonderingsnummer].getTotSpanningOpDiepte(
+                    infoDiepte)
+                << "kPa\n Met laagste waterstand\n"
                 << "Zetting: " << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getZettingOpDiepte(
                        infoDiepte)
@@ -437,6 +442,7 @@ int main(int argc, char *argv[]) {
     consolidationForm->addVariable("Y ", yCons);
     consolidationForm->addVariable("FEA [m]", freatic2)
         ->setTooltip("if this says 1.23e-8, it won't change the phreatic");
+    consolidationForm->addVariable("lowest freatisch", lowestFe);
     consolidationForm->addButton(
         "submit ", [&xCons, &yCons, &config, &screen]() {
             if (sonderingsnummer < sonderingsPunt.size()) {
@@ -453,6 +459,13 @@ int main(int argc, char *argv[]) {
                             << sonderingsPunt[sonderingsnummer].fea
                             << " [m] to " << freatic2 << "m";
                     freatic2 = 0.0000000123;
+                }
+                if (lowestFe != 0.0000000123) {
+                    sonderingsPunt[sonderingsnummer].setLowestPhea(lowestFe);
+                    msg_str << "\nChanged lowest phreatic from"
+                        << sonderingsPunt[sonderingsnummer].lowestPhea
+                        << " [m] to " << lowestFe << "m";
+                    lowestFe = 0.0000000123;
                 }
                 msg_str << "\nin Consolidation point " << sonderingsnummer
                         << "." << std::endl;
@@ -543,13 +556,14 @@ void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
 
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
                             double feaHoogte, test_enum enumval,
-                            Screen *screen) {
+                            Screen *screen,double laagsteFe) {
     if (sonderingsnummer == sonderingsPunt.size()) {
         // dan nieuwe aanmaken
         sonderingsPunt.push_back(Zettingsberekening(
             BelastingsType(beginPosLast, eindPosLast, lastGrootte, enumval),
             xPos, yPos));
         sonderingsPunt[sonderingsnummer].setPhea(feaHoogte);
+        sonderingsPunt[sonderingsnummer].setLowestPhea(laagsteFe);
         MessageDialog *m = new MessageDialog(
             screen, MessageDialog::Type::Information,
             "Zettingsberekeningspunt aangemaakt",

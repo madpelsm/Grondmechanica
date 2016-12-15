@@ -139,6 +139,9 @@ Zettingsberekening::Zettingsberekening(json js) {
     xPositie = js["x"].get<double>();
     yPositie = js["y"].get<double>();
     fea = js["fea"].get<double>();
+    if (js.find("laagste FEA") != js.end()) {
+        lowestPhea = js["laagste FEA"].get<double>();
+    }
     zettingsBerekeningJS = js;
     gen_msg();
     done = false;
@@ -165,6 +168,7 @@ void Zettingsberekening::gen_js() {
     js["x"] = xPositie;
     js["y"] = yPositie;
     js["fea"] = fea;
+    js["laagste FEA"] = lowestPhea; 
     zettingsBerekeningJS = js;
 }
 
@@ -219,7 +223,7 @@ void Zettingsberekening::berekenZetting() {
             (grondlagen.front().bovengrens - belastingsType.aanzetshoogte) /
                 ((double)gridSize);
         dDelta_sigma.reserve(num_elements);
-
+        double totaleSpanningOpZ = 0;
         double sigma_eff_op_aanzet = 0;
         bool corrected = false;
 
@@ -228,6 +232,7 @@ void Zettingsberekening::berekenZetting() {
         double diepte = 0;
         double totZetting = 0;
         double dDelt_sigma = 0;
+        double critcalMassWeight = 0;
         double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
         // placeholder for c and phi, find the lowest s_u
         double ESA_c_minimal = 0, ESA_phi_minimal = 0.00001,
@@ -257,6 +262,12 @@ void Zettingsberekening::berekenZetting() {
                         getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte);
                     ESA_c_minimal = grondlagen[i].c_a;
                     ESA_phi_minimal = grondlagen[i].phi_a;
+                    if (grondlagen[i].bovengrens > fea) {
+                        critcalMassWeight = grondlagen[i].drogeMassDichtheid;
+                    }
+                    else {
+                        critcalMassWeight = grondlagen[i].natteMassadichtheid-9.81;
+                    }
                 }
             }
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
@@ -270,11 +281,21 @@ void Zettingsberekening::berekenZetting() {
                     effectieveSpanningOpZ +=
                         (grondlagen[i].drogeMassDichtheid) * gridSize;
                 }
+                //find the total stresses with the lowest phea
+                if ((grondlagen[i].bovengrens - j) < lowestPhea) {
+                    totaleSpanningOpZ +=
+                        (grondlagen[i].natteMassadichtheid) *
+                        gridSize;
+                }
+                else {
+                    totaleSpanningOpZ +=
+                        (grondlagen[i].drogeMassDichtheid) * gridSize;
+                }
                 // TODO check dit
                 if ((grondlagen.front().bovengrens - diepte) <=
                     belastingsType.aanzetshoogte) {
                     if (!corrected) {
-                        sigma_eff_op_aanzet = effectieveSpanningOpZ;
+                        sigma_eff_op_aanzet = totaleSpanningOpZ;
                         corrected = true;
                     }
                     dDelt_sigma =
@@ -320,12 +341,13 @@ void Zettingsberekening::berekenZetting() {
                     dZettingPrim.push_back(zettingT);
                 }
                 dSigma_eff.push_back(effectieveSpanningOpZ);
+                dSigma_tot.push_back(totaleSpanningOpZ);
                 j = j + gridSize;
             }
             grondlagen[i].primZetting = laagzetting;
         }
         //        berekenSecZetting();
-        q_u_ESA = calculateq_u(ESA_c_minimal, ESA_phi_minimal);
+        q_u_ESA = calculateq_u(ESA_c_minimal, ESA_phi_minimal, critcalMassWeight);
         q_u_TSA = calc_q_u_TSA(TSA_c_minimal, TSA_phi_minimal);
         double tot = 0;
         graphDzetting.resize(dZettingPrim.size(), 0.0);
@@ -414,6 +436,10 @@ float Zettingsberekening::getDSigmaOpDiepte(float diepte) {
         dDelta_sigma);
 }
 
+float Zettingsberekening::getTotSpanningOpDiepte(float diepte){
+    return getOpDiepte(diepte, dSigma_tot);
+}
+
 float Zettingsberekening::getGridSize() { return gridSize; }
 
 double Zettingsberekening::Consolidatiegraad(double Tv) {
@@ -437,6 +463,12 @@ double Zettingsberekening::Consolidatiegraad(double Tv) {
         U -= T2;
     }
     return U;
+}
+
+void Zettingsberekening::setLowestPhea(double _phe) {
+    lowestPhea = _phe;
+    gen_msg();
+    gen_js();
 }
 
 double Zettingsberekening::Tijdsfactor(double U) {
@@ -696,8 +728,8 @@ double BelastingsType::sigma_plate_load(double L, double B, double z) {
     return s;
 }
 
-double Zettingsberekening::calculateq_u(double c, double phi) {
-    double phi_inRads = phi / 180 * pi;
+double Zettingsberekening::calculateq_u(double c, double _phi,double massaGew) {
+    double phi_inRads = _phi / 180 * pi;
     /*
     double N_q =
         exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
@@ -721,7 +753,7 @@ double Zettingsberekening::calculateq_u(double c, double phi) {
         dSigma_eff);
     double D_gamma =
         grondlagen.front().bovengrens - belastingsType.aanzetshoogte;
-    double Qu_ESA = gamma_eff * D_gamma * (N_q - 1) * s_q * d_q +
+    return Qu_ESA = gamma_eff * D_gamma * (N_q - 1) * s_q * d_q +
                     0.5 * gamma_eff * belastingsType.x2 * N_gamma * s_gamma;
                     */
     double N_c = 0;
@@ -729,7 +761,7 @@ double Zettingsberekening::calculateq_u(double c, double phi) {
         exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
 
     if (phi_inRads != 0) {
-        N_c = (N_q - 1) / tan(phi);
+        N_c = (N_q - 1) / tan(phi_inRads);
     }
     double s_q = 1;
     double s_gamma = 1;
@@ -742,9 +774,8 @@ double Zettingsberekening::calculateq_u(double c, double phi) {
     double gamma_eff = getOpDiepte(
         grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
         dSigma_eff);
-
     return s_q * N_q * gamma_eff + N_c * c +
-           s_gamma * N_gamma * gamma_eff * belastingsType.x2 / 2;
+           s_gamma * N_gamma * massaGew * belastingsType.x2 / 2;
 }
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {
