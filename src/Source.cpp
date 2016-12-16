@@ -338,7 +338,7 @@ int main(int argc, char *argv[]) {
                             << sonderingsPunt[i].getGridSize() << "m\n"
                             << "ESA: " << sonderingsPunt[i].q_u_ESA
                             << " kPa TSA: " << sonderingsPunt[i].q_u_TSA
-                            << " kPa\n";
+                            << " kPa\n\n";
                     }
 
                     dur = (std::clock() - timer) / ((double)CLOCKS_PER_SEC);

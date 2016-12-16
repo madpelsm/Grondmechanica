@@ -168,7 +168,7 @@ void Zettingsberekening::gen_js() {
     js["x"] = xPositie;
     js["y"] = yPositie;
     js["fea"] = fea;
-    js["laagste FEA"] = lowestPhea; 
+    js["laagste FEA"] = lowestPhea;
     zettingsBerekeningJS = js;
 }
 
@@ -250,23 +250,23 @@ void Zettingsberekening::berekenZetting() {
                 true) {
                 // this might be wrong, the way s_u gets calculated p.e.
                 // TSA su
-                if (s_u_TSA >
+                if (s_u_TSA >=
                     getSU(grondlagen[i].c, grondlagen[i].phi, diepte)) {
                     s_u_TSA = getSU(grondlagen[i].c, grondlagen[i].phi, diepte);
                     TSA_c_minimal = grondlagen[i].c;
                     TSA_phi_minimal = grondlagen[i].phi;
                 }
-                if (s_u_ESA >
+                if (s_u_ESA >=
                     getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte)) {
                     s_u_ESA =
                         getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte);
                     ESA_c_minimal = grondlagen[i].c_a;
                     ESA_phi_minimal = grondlagen[i].phi_a;
-                    if (grondlagen[i].bovengrens > fea) {
+                    if (grondlagen[i].ondergrens > fea) {
                         critcalMassWeight = grondlagen[i].drogeMassDichtheid;
-                    }
-                    else {
-                        critcalMassWeight = grondlagen[i].natteMassadichtheid-9.81;
+                    } else {
+                        critcalMassWeight =
+                            grondlagen[i].natteMassadichtheid - waterGewicht;
                     }
                 }
             }
@@ -281,13 +281,11 @@ void Zettingsberekening::berekenZetting() {
                     effectieveSpanningOpZ +=
                         (grondlagen[i].drogeMassDichtheid) * gridSize;
                 }
-                //find the total stresses with the lowest phea
+                // find the total stresses with the lowest phea
                 if ((grondlagen[i].bovengrens - j) < lowestPhea) {
                     totaleSpanningOpZ +=
-                        (grondlagen[i].natteMassadichtheid) *
-                        gridSize;
-                }
-                else {
+                        (grondlagen[i].natteMassadichtheid) * gridSize;
+                } else {
                     totaleSpanningOpZ +=
                         (grondlagen[i].drogeMassDichtheid) * gridSize;
                 }
@@ -347,8 +345,10 @@ void Zettingsberekening::berekenZetting() {
             grondlagen[i].primZetting = laagzetting;
         }
         //        berekenSecZetting();
-        q_u_ESA = calculateq_u(ESA_c_minimal, ESA_phi_minimal, critcalMassWeight);
-        q_u_TSA = calc_q_u_TSA(TSA_c_minimal, TSA_phi_minimal);
+        q_u_ESA =
+            calculateq_u(ESA_c_minimal, ESA_phi_minimal, critcalMassWeight);
+        q_u_TSA =
+            calculateq_u(TSA_c_minimal, TSA_phi_minimal, critcalMassWeight);
         double tot = 0;
         graphDzetting.resize(dZettingPrim.size(), 0.0);
         for (int k = 0; k < dZettingPrim.size(); k++) {
@@ -436,7 +436,7 @@ float Zettingsberekening::getDSigmaOpDiepte(float diepte) {
         dDelta_sigma);
 }
 
-float Zettingsberekening::getTotSpanningOpDiepte(float diepte){
+float Zettingsberekening::getTotSpanningOpDiepte(float diepte) {
     return getOpDiepte(diepte, dSigma_tot);
 }
 
@@ -728,54 +728,71 @@ double BelastingsType::sigma_plate_load(double L, double B, double z) {
     return s;
 }
 
-double Zettingsberekening::calculateq_u(double c, double _phi,double massaGew) {
+double Zettingsberekening::calculateq_u(double c, double _phi,
+                                        double massaGew) {
     double phi_inRads = _phi / 180 * pi;
-    /*
-    double N_q =
-        exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
-    double N_gamma = (N_q - 1) * tan(1.4 * phi_inRads);
+    // q_u = d_q*s_q*N_q*p_t+d_c*s_c*N_c*c+s_g*N_g*g_k*B/2
+    // d_q = 1
+    // s_q = 1+B/L * sin(phi')
+    // s_c = (s_q*N_q-1)/(N_q-1)
+    // s_g=1-0.3*B/L
+    // s_q=s_c=s_g als L/B >5
+    // N_q = exp(pi*tan(phi))*tan(Pi/4+phi/2)
+    // N_c = (N_q-1)/tan(phi)
+    // N_g = 2*(N_q-1)*tan(phi)
     double s_q = 1;
-    if (belastingsType.x1 != 0) {
-        s_q += belastingsType.x2 / belastingsType.x1 * tan(phi_inRads);
-    }
-    double d_q = 1;
-    if (belastingsType.x2 != 0) {
-        d_q = 1 +
-              2 * tan(phi_inRads) * pow(1 - sin(phi_inRads), 2) *
-                  atan(belastingsType.aanzetshoogte / belastingsType.x2);
-    }
-    double s_gamma = 1;
-    if (belastingsType.x1 != 0) {
-        s_gamma -= 0.4 * belastingsType.x2 / belastingsType.x1;
-    }
-    double gamma_eff = getOpDiepte(
-        grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
-        dSigma_eff);
-    double D_gamma =
-        grondlagen.front().bovengrens - belastingsType.aanzetshoogte;
-    return Qu_ESA = gamma_eff * D_gamma * (N_q - 1) * s_q * d_q +
-                    0.5 * gamma_eff * belastingsType.x2 * N_gamma * s_gamma;
-                    */
-    double N_c = 0;
-    double N_q =
-        exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
+    double s_g = 1;
+    double s_c = 1;
 
+    double N_q = exp(pi * tan(phi_inRads)) * tan(pi / 4.0 + phi_inRads / 2) *
+                 tan(pi / 4.0 + phi_inRads / 2);
+    double N_c = 0;
     if (phi_inRads != 0) {
         N_c = (N_q - 1) / tan(phi_inRads);
     }
-    double s_q = 1;
-    double s_gamma = 1;
+    double N_g = 2 * (N_q - 1) * tan(phi_inRads);
+    double p_t = getEffectieveOpDiepte(grondlagen.front().bovengrens -
+                                       belastingsType.aanzetshoogte);
+    double d_c = 1;
+    double d_q = 1;
     if (belastingsType.x1 != 0) {
-        s_q += belastingsType.x2 / belastingsType.x1 * sin(phi_inRads);
-        s_gamma = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
+        if (belastingsType.x2 / belastingsType.x1 < 5) {
+            s_q = 1 + belastingsType.x2 / belastingsType.x1 * sin(phi_inRads);
+            s_c = (s_q * N_q - 1) / (N_q - 1);
+            s_g = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
+        }
     }
-    double s_c = (s_q * N_q - 1) / (N_q - 1);
-    double N_gamma = (N_q - 1) * tan(1.4 * phi_inRads);
-    double gamma_eff = getOpDiepte(
-        grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
-        dSigma_eff);
-    return s_q * N_q * gamma_eff + N_c * c +
-           s_gamma * N_gamma * massaGew * belastingsType.x2 / 2;
+    double g_k = massaGew;
+    std::cout << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
+              << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
+              << N_g << "*" << g_k << "*" << belastingsType.x2 << "/" << 2.0
+              << std::endl;
+    //    std::cout << " g_k: " << g_k << " N_g: " << N_g << " p_t: " << p_t
+    //              << " s_q: " << s_q << " s_g: " << s_g << " s_c: " << s_c
+    //              << " N_q: " << N_q << " N_c: " << N_c << std::endl;
+    double _qu = d_q * s_q * N_q * p_t + d_c * s_c * N_c * c +
+                 s_g * N_g * g_k * belastingsType.x2 / 2.0;
+    return _qu;
+    //    double N_c = 0;
+    //    double N_q =
+    //        exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
+    //
+    //    if (phi_inRads != 0) {
+    //        N_c = (N_q - 1) / tan(phi_inRads);
+    //    }
+    //    double s_q = 1;
+    //    double s_gamma = 1;
+    //    if (belastingsType.x1 != 0) {
+    //        s_q += belastingsType.x2 / belastingsType.x1 * sin(phi_inRads);
+    //        s_gamma = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
+    //    }
+    //    double s_c = (s_q * N_q - 1) / (N_q - 1);
+    //    double N_gamma = (N_q - 1) * tan(1.4 * phi_inRads);
+    //    double gamma_eff = getOpDiepte(
+    //        grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
+    //        dSigma_eff);
+    //    return s_q * N_q * gamma_eff + N_c * c +
+    //           s_gamma * N_gamma * massaGew * belastingsType.x2 / 2;
 }
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {
