@@ -731,6 +731,19 @@ double BelastingsType::sigma_plate_load(double L, double B, double z) {
 double Zettingsberekening::calculateq_u(double c, double _phi,
                                         double massaGew) {
     double phi_inRads = _phi / 180 * pi;
+    double L = 1, B = 1;
+    if (belastingsType.type == 0) {
+        std::cout << "plaat" << std::endl;
+        L = belastingsType.x1;
+        B = belastingsType.x2;
+    } else if (belastingsType.type = 1) {
+        B = belastingsType.belastingsBreedte;
+        L = 6 * B;
+    } else if (belastingsType.type == 2) {
+        B = belastingsType.r;
+        L = belastingsType.r;
+    }
+
     // q_u = d_q*s_q*N_q*p_t+d_c*s_c*N_c*c+s_g*N_g*g_k*B/2
     // d_q = 1
     // s_q = 1+B/L * sin(phi')
@@ -755,23 +768,22 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
                                        belastingsType.aanzetshoogte);
     double d_c = 1;
     double d_q = 1;
-    if (belastingsType.x1 != 0) {
-        if (belastingsType.x2 / belastingsType.x1 < 5) {
-            s_q = 1 + belastingsType.x2 / belastingsType.x1 * sin(phi_inRads);
+    if (L != 0) {
+        if (B / L < 5) {
+            s_q = 1 + B / L * sin(phi_inRads);
             s_c = (s_q * N_q - 1) / (N_q - 1);
-            s_g = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
+            s_g = 1 - 0.3 * B / L;
         }
     }
     double g_k = massaGew;
     std::cout << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
               << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
-              << N_g << "*" << g_k << "*" << belastingsType.x2 << "/" << 2.0
-              << std::endl;
+              << N_g << "*" << g_k << "*" << B << "/" << 2.0 << std::endl;
     //    std::cout << " g_k: " << g_k << " N_g: " << N_g << " p_t: " << p_t
     //              << " s_q: " << s_q << " s_g: " << s_g << " s_c: " << s_c
     //              << " N_q: " << N_q << " N_c: " << N_c << std::endl;
-    double _qu = d_q * s_q * N_q * p_t + d_c * s_c * N_c * c +
-                 s_g * N_g * g_k * belastingsType.x2 / 2.0;
+    double _qu =
+        d_q * s_q * N_q * p_t + d_c * s_c * N_c * c + s_g * N_g * g_k * B / 2.0;
     return _qu;
     //    double N_c = 0;
     //    double N_q =
