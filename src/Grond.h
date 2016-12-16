@@ -68,10 +68,12 @@ class Zettingsberekening {
    public:
     bool done = false;
     json zettingsBerekeningJS;
-    std::vector<double> dZettingPrim, dDelta_sigma, dSigma_eff, graphDzetting,dSigma_tot;
+    std::vector<double> dZettingPrim, dDelta_sigma, dSigma_eff, graphDzetting,
+        dSigma_tot;
     BelastingsType
         belastingsType;  // bepaal adhv dit de formule voor de belasting
-    double fea = 0, sumPrecision = 50, PI = 4 * atan(1), waterGewicht = 9.81,lowestPhea =0;
+    double fea = 0, sumPrecision = 1000, PI = 4 * atan(1), waterGewicht = 9.81,
+           lowestPhea = 0;
     double pi = 4 * atan(1);
     double q_u_ESA = 0, q_u_TSA = 0,
            maxZettingT = 0.000001;  // evenwichtsdraagvermogen
@@ -111,7 +113,6 @@ class Zettingsberekening {
     double getTimeToConsolidationDegree(double U);  // use fraction of U;
     double getDrainageLength(Grond &onder, Grond &huidig, Grond &boven);
     void setPosition(double xCons, double yCons);
-    double calculateq_u(double c, double phi,double massaGew);
-    double calc_q_u_TSA(double c, double phi);
+    double calculateq_u(double c, double phi, double massaGew);
     double getSU(double c, double phi, double sigma);
 };

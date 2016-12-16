@@ -142,8 +142,8 @@ Zettingsberekening::Zettingsberekening(json js) {
     if (js.find("laagste FEA") != js.end()) {
         lowestPhea = js["laagste FEA"].get<double>();
     }
-    zettingsBerekeningJS = js;
     gen_msg();
+    gen_js();
     done = false;
 }
 
@@ -293,7 +293,7 @@ void Zettingsberekening::berekenZetting() {
                 if ((grondlagen.front().bovengrens - diepte) <=
                     belastingsType.aanzetshoogte) {
                     if (!corrected) {
-                        sigma_eff_op_aanzet = totaleSpanningOpZ;
+                        sigma_eff_op_aanzet = effectieveSpanningOpZ;
                         corrected = true;
                     }
                     dDelt_sigma =
@@ -303,10 +303,8 @@ void Zettingsberekening::berekenZetting() {
                                           ? 0
                                           : grondlagen.front().bovengrens -
                                                 belastingsType.aanzetshoogte),
-                            xPositie, yPositie) /
-                        belastingsType.qs *
+                            xPositie, yPositie) *
                         (belastingsType.qs - sigma_eff_op_aanzet);
-
                     dDelta_sigma.push_back(dDelt_sigma);
                 }
                 // hieronder. zal altijd false zijn als ocr =1 en ddelt_sigma >0
@@ -444,7 +442,7 @@ float Zettingsberekening::getGridSize() { return gridSize; }
 
 double Zettingsberekening::Consolidatiegraad(double Tv) {
     double U = 0;
-    bool iterationMethod = false;
+    bool iterationMethod = true;
     if (!iterationMethod) {
         if (Tv < 0.2827433389) {
             U = 2 * sqrt(PI * Tv) / PI;
@@ -455,10 +453,17 @@ double Zettingsberekening::Consolidatiegraad(double Tv) {
     if (iterationMethod) {
         U = 1;
         double M = 0, expPart = 0, T2 = 0;
-        for (double m = 0; m < sumPrecision; m++) {
+        double expTimesM = 1;
+        for (double m = 0; m < sumPrecision && expTimesM != 0; m++) {
             M = std::pow(0.5 * PI * (2.0 * m + 1), 2);
             expPart = std::exp(-M * Tv);
-            T2 += (2 / M) * expPart;
+            expTimesM = expPart * (2 / M);
+            if (expTimesM == 0) {
+                // std::cout << "aborting iteration after " << m << "
+                // iterations"
+                //           << std::endl;
+            }
+            T2 += expTimesM;
         }
         U -= T2;
     }
@@ -496,8 +501,34 @@ double Zettingsberekening::getZettingNaT(double t) {
         } else {
             // dus i =0 of i=grondlagen.size()-1
             // bereken direct T_v aangezien D=H/2 of dus D^2=H^2*0.25
+            if (grondlagen.size() == 1) {
+                // only 1 layer present
+                // assume worst case: only seepage to the top
+                TV = grondlagen[i].c_v * t / (pow(grondlagen[i].laagdikte, 2));
+            } else {
+                if (i == 0) {
+                    // if the first layer
+                    if (grondlagen[i].k_s <= 100 * grondlagen[i + 1].k_s) {
+                        // seepage through layer below
+                        TV = grondlagen[i].c_v * t /
+                             pow(grondlagen[i].laagdikte * 0.5, 2);
+                    } else {
+                        TV = grondlagen[i].c_v * t /
+                             pow(grondlagen[i].laagdikte, 2);
+                    }
+                } else {
+                    // only the last one remains
+                    if (grondlagen[i - 1].k_s >= 100 * grondlagen[i].k_s) {
+                        TV = grondlagen[i].c_v * t /
+                             pow(grondlagen[i].laagdikte, 2);
+                    } else {
+                        TV = grondlagen[i].c_v * t /
+                             pow(grondlagen[i].laagdikte, 2);
+                    }
+                }
+            }
             TV = grondlagen[i].c_v * t /
-                 (grondlagen[i].laagdikte * grondlagen[i].laagdikte * 0.25);
+                 (grondlagen[i].laagdikte * grondlagen[i].laagdikte);
             // std::cout << "T_v uiteinde" << TV << "\n";
         }
         // tel consolidatiegraad * totale primaire zetting vd laag = bereikte
@@ -595,7 +626,7 @@ float BelastingsType::deltaSig(float z, float xPositie, float yPositie) {
         double gamma = std::atan((xPositie - x1) / z);
         double beta = std::atan((xPositie - x2) / z);
         double alpha = gamma - beta;
-        delta_sigma = (qs / pi) * (alpha + sin(alpha) * cos(alpha + 2 * beta));
+        delta_sigma = (1 / pi) * (alpha + sin(alpha) * cos(alpha + 2 * beta));
     }
 
     if (type == 0 && initialised) {
@@ -687,7 +718,7 @@ float BelastingsType::deltaSig(float z, float xPositie, float yPositie) {
 
 double BelastingsType::sigma_circular_load(double z, double r) {
     double I0 = 1 - pow((1 / (1 + pow((r / z), 2))), 1.5);
-    return qs * I0;
+    return I0;
 }
 
 void BelastingsType::gen_js() {
@@ -723,17 +754,26 @@ double BelastingsType::sigma_plate_load(double L, double B, double z) {
     double R2 = pow(B * B + z * z, 0.5);
     double R3 = pow(L * L + B * B + z * z, 0.5);
     double s =
-        qs / (2 * pi) * (atan(L * B / (z * R3)) +
-                         L * B * z / R3 * (1 / pow(R1, 2) + 1 / pow(R2, 2)));
+        1 / (2 * pi) * (atan(L * B / (z * R3)) +
+                        L * B * z / R3 * (1 / pow(R1, 2) + 1 / pow(R2, 2)));
     return s;
 }
 
 double Zettingsberekening::calculateq_u(double c, double _phi,
                                         double massaGew) {
+    // q_u = d_q*s_q*N_q*p_t+d_c*s_c*N_c*c+s_g*N_g*g_k*B/2
+    // d_q = 1
+    // s_q = 1+B/L * sin(phi')
+    // s_c = (s_q*N_q-1)/(N_q-1)
+    // s_g=1-0.3*B/L
+    // s_q=s_c=s_g als L/B >5
+    // N_q = exp(pi*tan(phi))*tan(Pi/4+phi/2)
+    // N_c = (N_q-1)/tan(phi)
+    // N1 = 2*(N_q-1)*tan(phi)
+
     double phi_inRads = _phi / 180 * pi;
     double L = 1, B = 1;
     if (belastingsType.type == 0) {
-        std::cout << "plaat" << std::endl;
         L = belastingsType.x1;
         B = belastingsType.x2;
     } else if (belastingsType.type = 1) {
@@ -743,25 +783,16 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
         B = belastingsType.r;
         L = belastingsType.r;
     }
-
-    // q_u = d_q*s_q*N_q*p_t+d_c*s_c*N_c*c+s_g*N_g*g_k*B/2
-    // d_q = 1
-    // s_q = 1+B/L * sin(phi')
-    // s_c = (s_q*N_q-1)/(N_q-1)
-    // s_g=1-0.3*B/L
-    // s_q=s_c=s_g als L/B >5
-    // N_q = exp(pi*tan(phi))*tan(Pi/4+phi/2)
-    // N_c = (N_q-1)/tan(phi)
-    // N_g = 2*(N_q-1)*tan(phi)
     double s_q = 1;
     double s_g = 1;
     double s_c = 1;
-
     double N_q = exp(pi * tan(phi_inRads)) * tan(pi / 4.0 + phi_inRads / 2) *
                  tan(pi / 4.0 + phi_inRads / 2);
     double N_c = 0;
     if (phi_inRads != 0) {
         N_c = (N_q - 1) / tan(phi_inRads);
+    } else if (phi_inRads == 0) {
+        N_c = pi + 2;
     }
     double N_g = 2 * (N_q - 1) * tan(phi_inRads);
     double p_t = getEffectieveOpDiepte(grondlagen.front().bovengrens -
@@ -776,55 +807,14 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
         }
     }
     double g_k = massaGew;
-    std::cout << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
-              << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
-              << N_g << "*" << g_k << "*" << B << "/" << 2.0 << std::endl;
-    //    std::cout << " g_k: " << g_k << " N_g: " << N_g << " p_t: " << p_t
-    //              << " s_q: " << s_q << " s_g: " << s_g << " s_c: " << s_c
-    //              << " N_q: " << N_q << " N_c: " << N_c << std::endl;
+    //  std::cout << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
+    //            << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
+    //            << N_g << "*" << g_k << "*" << B << "/" << 2.0 << std::endl;
     double _qu =
         d_q * s_q * N_q * p_t + d_c * s_c * N_c * c + s_g * N_g * g_k * B / 2.0;
     return _qu;
-    //    double N_c = 0;
-    //    double N_q =
-    //        exp(pi * tan(phi_inRads)) * pow(tan(pi / 4 + phi_inRads / 2), 2);
-    //
-    //    if (phi_inRads != 0) {
-    //        N_c = (N_q - 1) / tan(phi_inRads);
-    //    }
-    //    double s_q = 1;
-    //    double s_gamma = 1;
-    //    if (belastingsType.x1 != 0) {
-    //        s_q += belastingsType.x2 / belastingsType.x1 * sin(phi_inRads);
-    //        s_gamma = 1 - 0.3 * belastingsType.x2 / belastingsType.x1;
-    //    }
-    //    double s_c = (s_q * N_q - 1) / (N_q - 1);
-    //    double N_gamma = (N_q - 1) * tan(1.4 * phi_inRads);
-    //    double gamma_eff = getOpDiepte(
-    //        grondlagen.front().bovengrens - belastingsType.aanzetshoogte,
-    //        dSigma_eff);
-    //    return s_q * N_q * gamma_eff + N_c * c +
-    //           s_gamma * N_gamma * massaGew * belastingsType.x2 / 2;
 }
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {
     return c + sigma * std::tan(phi);
-}
-double Zettingsberekening::calc_q_u_TSA(double c, double phi) {
-    // formule 12.11
-    // q_u = 5.14*s_u*s_c*d_c*i_c*b_c*g_c
-    if (belastingsType.x2 != 0) {
-        // veronderstel geen excentriciteit
-        double s_c = 1 + 0.2 * belastingsType.x2 / ((double)belastingsType.x1);
-        // set d_c =1, is safer, assume layers above are weaker
-        // double d_c =
-        // 1+0.33*std::atan(belastingsType.aanzetshoogte/belastingsType.x2);
-        /*    double d_c = 1; //assume horzontal only
-            double i_c = 1; //asume horizontal only
-            double b_c =1; //assume horizontal only
-            double g_c 1; // assume horizontal only
-            */
-        return 5.14 * c * s_c;
-    } else
-        return 0;
 }

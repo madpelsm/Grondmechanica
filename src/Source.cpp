@@ -1,4 +1,3 @@
-
 #include <Grond.h>
 #include <nanogui/nanogui.h>
 #include <stdio.h>
@@ -27,11 +26,11 @@ float gridSize = 0.001, graphScale = 1, infoDiepte = 0;
 int windowMargin = 5;
 bool multithreaded = true;
 double freatic2 = 0.0000000123;
-double laagsteFea = 0, lowestFe= 0.0000000123;
+double laagsteFea = 0, lowestFe = 0.0000000123;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
     aanzetshoogte = 0, xPos, yPos = 0, sonderingsnummer, feaHoogte,
     natteMassadichtheid, beginPosLast, eindPosLast, lastGrootte, c_v = 0.0,
-    k_s = 0.0, tijd = 999999, OCR = 1, ontlastingsconstante = 1,
+    k_s = 0.0, tijd = 1, OCR = 1, ontlastingsconstante = 1,
     c_alpha1 = 0.00000001;
 double c = 0, c_a = 0, phi = 0, phi_a = 0;
 int WIDTH = 1000, HEIGHT = 800, pointPrecisionInDialog = 5;
@@ -51,8 +50,8 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
                   test_enum enumval, double aanzet, Screen *screen);
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
-                            double feaHoogte, test_enum enumval,
-                            Screen *screen,double fe);
+                            double feaHoogte, test_enum enumval, Screen *screen,
+                            double fe);
 std::string writeToFile(std::string _content);
 std::string makeSaveFile(std::vector<Zettingsberekening> &e);
 void readFromFile();
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
     sonderingGUI->addButton("Maak zettingspunt aan", [&screen, &config]() {
 
         genereerSonderingsPunt(sonderingsnummer, xPos, yPos, feaHoogte,
-                               loadType, screen,laagsteFea);
+                               loadType, screen, laagsteFea);
         updateConfigText(config);
 
     });
@@ -388,7 +387,7 @@ int main(int argc, char *argv[]) {
         writeToFile(str.str());
     });
     zettingsGUI->addVariable("Diepte", infoDiepte);
-    zettingsGUI->addVariable("Tijd [s]", tijd);
+    zettingsGUI->addVariable("Tijd [dagen]", tijd);
     zettingsGUI->addButton("Geef info op diepte", [&screen]() {
 
         if (sonderingsnummer < sonderingsPunt.size()) {
@@ -397,8 +396,14 @@ int main(int argc, char *argv[]) {
                     << std::setprecision(pointPrecisionInDialog) << infoDiepte
                     << "m" << std::endl;
             std::ostringstream str;
-            double zettingNaT =
-                sonderingsPunt[sonderingsnummer].getZettingNaT(tijd);
+            // below tijd gets converted to seconds, as there are
+            // 24(hours/day)*3600(seconds/hour) in one day
+            double zettingNaT = sonderingsPunt[sonderingsnummer].getZettingNaT(
+                24 * 3600 * tijd);
+            std::string TijdsMaat = " dagen";
+            if (tijd <= 1) {
+                TijdsMaat = " dag";
+            }
             str << "Effectieve spanning: "
                 << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getEffectieveOpDiepte(
@@ -407,16 +412,16 @@ int main(int argc, char *argv[]) {
                 << "Spanningsverschil: "
                 << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getDSigmaOpDiepte(
-                    infoDiepte)
+                       infoDiepte)
                 << "kPa\nTotale spanning: "
                 << sonderingsPunt[sonderingsnummer].getTotSpanningOpDiepte(
-                    infoDiepte)
+                       infoDiepte)
                 << "kPa\n Met laagste waterstand\n"
                 << "Zetting: " << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getZettingOpDiepte(
                        infoDiepte)
                 << "m\n"
-                << "na " << tijd << "s is reeds: " << zettingNaT
+                << "na " << tijd << TijdsMaat<<" is reeds: " << zettingNaT
                 << "m zetting bereikt\n"
                 << "U=" << (zettingNaT /
                             sonderingsPunt[sonderingsnummer].getTotaleZetting())
@@ -463,8 +468,8 @@ int main(int argc, char *argv[]) {
                 if (lowestFe != 0.0000000123) {
                     sonderingsPunt[sonderingsnummer].setLowestPhea(lowestFe);
                     msg_str << "\nChanged lowest phreatic from"
-                        << sonderingsPunt[sonderingsnummer].lowestPhea
-                        << " [m] to " << lowestFe << "m";
+                            << sonderingsPunt[sonderingsnummer].lowestPhea
+                            << " [m] to " << lowestFe << "m";
                     lowestFe = 0.0000000123;
                 }
                 msg_str << "\nin Consolidation point " << sonderingsnummer
@@ -555,8 +560,8 @@ void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
 }
 
 void genereerSonderingsPunt(int sonderingsnummer, double xPos, double yPos,
-                            double feaHoogte, test_enum enumval,
-                            Screen *screen,double laagsteFe) {
+                            double feaHoogte, test_enum enumval, Screen *screen,
+                            double laagsteFe) {
     if (sonderingsnummer == sonderingsPunt.size()) {
         // dan nieuwe aanmaken
         sonderingsPunt.push_back(Zettingsberekening(
