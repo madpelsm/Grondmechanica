@@ -24,7 +24,7 @@ Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
         samendrukkingsCoeff = 0.0000000001;
     }
     if (natteMassadichtheid == 0) {
-        natteMassadichtheid = drogeMassDichtheid * 1.1;
+        natteMassadichtheid = drogeMassDichtheid * 1.2;
     }
     if (ontlastingsconstante == 1) {
         ontlastingsconstante = samendrukkingsCoeff;
@@ -238,6 +238,8 @@ void Zettingsberekening::berekenZetting() {
         double ESA_c_minimal = 0, ESA_phi_minimal = 0.00001,
                TSA_phi_minimal = 0.0001, s_u_TSA = 999999999999999,
                s_u_ESA = 9999999999999, TSA_c_minimal = 0;
+        q_u_ESA = 999999;
+        q_u_TSA = 999999;
         for (int i = 0; i < grondlagen.size(); i++) {
             double j = 0;
             double laagzetting = 0;
@@ -250,24 +252,11 @@ void Zettingsberekening::berekenZetting() {
                 true) {
                 // this might be wrong, the way s_u gets calculated p.e.
                 // TSA su
-                if (s_u_TSA >=
-                    getSU(grondlagen[i].c, grondlagen[i].phi, diepte)) {
-                    s_u_TSA = getSU(grondlagen[i].c, grondlagen[i].phi, diepte);
-                    TSA_c_minimal = grondlagen[i].c;
-                    TSA_phi_minimal = grondlagen[i].phi;
-                }
-                if (s_u_ESA >=
-                    getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte)) {
-                    s_u_ESA =
-                        getSU(grondlagen[i].c_a, grondlagen[i].phi_a, diepte);
-                    ESA_c_minimal = grondlagen[i].c_a;
-                    ESA_phi_minimal = grondlagen[i].phi_a;
-                    if (grondlagen[i].ondergrens > fea) {
-                        critcalMassWeight = grondlagen[i].drogeMassDichtheid;
-                    } else {
-                        critcalMassWeight =
-                            grondlagen[i].natteMassadichtheid - waterGewicht;
-                    }
+                if (grondlagen[i].ondergrens > fea) {
+                    critcalMassWeight = grondlagen[i].drogeMassDichtheid;
+                } else {
+                    critcalMassWeight =
+                        grondlagen[i].natteMassadichtheid - waterGewicht;
                 }
             }
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
@@ -341,12 +330,29 @@ void Zettingsberekening::berekenZetting() {
                 j = j + gridSize;
             }
             grondlagen[i].primZetting = laagzetting;
+            // std::cout<<laagzetting<<std::endl;
+            if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
+                (diepte - grondlagen[i].bovengrens +
+                     belastingsType.aanzetshoogte <
+                 2 * belastingsType.belastingsBreedte)) {
+                double tempQUESA = calculateq_u(
+                    grondlagen[i].c_a, grondlagen[i].phi_a, critcalMassWeight);
+                if (tempQUESA < q_u_ESA && tempQUESA != 0) {
+                    q_u_ESA = tempQUESA;
+                }
+            }
+            if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte) {
+                double tempQUTSA = calculateq_u(
+                    grondlagen[i].c, grondlagen[i].phi, critcalMassWeight);
+                if (tempQUTSA < q_u_TSA && tempQUTSA != 0) {
+                    q_u_TSA = tempQUTSA;
+                }
+            }
         }
         //        berekenSecZetting();
-        q_u_ESA =
-            calculateq_u(ESA_c_minimal, ESA_phi_minimal, critcalMassWeight);
-        q_u_TSA =
-            calculateq_u(TSA_c_minimal, TSA_phi_minimal, critcalMassWeight);
+
+        // q_u_ESA =
+        //     calculateq_u(ESA_c_minimal, ESA_phi_minimal, critcalMassWeight);
         double tot = 0;
         graphDzetting.resize(dZettingPrim.size(), 0.0);
         for (int k = 0; k < dZettingPrim.size(); k++) {
@@ -799,22 +805,26 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
                                        belastingsType.aanzetshoogte);
     double d_c = 1;
     double d_q = 1;
-    if (L != 0) {
-        if (B / L < 5) {
+    if (B != 0) {
+        if (L / B < 5) {
             s_q = 1 + B / L * sin(phi_inRads);
             s_c = (s_q * N_q - 1) / (N_q - 1);
             s_g = 1 - 0.3 * B / L;
         }
     }
     double g_k = massaGew;
-    //  std::cout << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
-    //            << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
-    //            << N_g << "*" << g_k << "*" << B << "/" << 2.0 << std::endl;
+
     double _qu =
         d_q * s_q * N_q * p_t + d_c * s_c * N_c * c + s_g * N_g * g_k * B / 2.0;
+    // std::cout << "q_u = d_q*s_q*N_q*p_t+d_c*s_c*N_c*c+s_g*N_g*g_k*B/2\n"
+    //           << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
+    //           << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
+    //           << N_g << "*" << g_k << "*" << B << "/" << 2.0 << "=" << _qu
+    //           << "\n"
+    //           << std::endl;
     return _qu;
 }
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {
-    return c + sigma * std::tan(phi);
+    return c + sigma * abs(std::tan(phi / (180.0) * pi));
 }

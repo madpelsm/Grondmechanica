@@ -413,10 +413,10 @@ int main(int argc, char *argv[]) {
                 << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getDSigmaOpDiepte(
                        infoDiepte)
-                << "kPa\nTotale spanning: "
+                << "kPa\nTotale spanning bij laagste waterstand: "
                 << sonderingsPunt[sonderingsnummer].getTotSpanningOpDiepte(
                        infoDiepte)
-                << "kPa\n Met laagste waterstand\n"
+                << "kPa\n"
                 << "Zetting: " << std::setprecision(pointPrecisionInDialog)
                 << sonderingsPunt[sonderingsnummer].getZettingOpDiepte(
                        infoDiepte)
