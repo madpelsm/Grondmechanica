@@ -1,5 +1,4 @@
 #include <Grond.h>
-
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
              float _drogeMassaDichtheid, std::string _Naam, double c_v,
              double k_s = 0.0, double _nattemassadichtheid, double _OCR,
@@ -776,8 +775,24 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
     // N_q = exp(pi*tan(phi))*tan(Pi/4+phi/2)
     // N_c = (N_q-1)/tan(phi)
     // N1 = 2*(N_q-1)*tan(phi)
-
     double phi_inRads = _phi / 180 * pi;
+
+    double phi_partialSafetyF = 1;
+    double effectiveCohesion_safetyF = 1;
+    if (phi_inRads == 0) {
+        // then c represents s_u -> undrained shear strength;
+        effectiveCohesion_safetyF = 1.4;
+    }
+    // hardcoded option to use safety factors
+    if (true) {
+        phi_partialSafetyF = 1.25;
+        effectiveCohesion_safetyF = 1.25;
+        if (phi_inRads == 0) {
+            // then c represents s_u -> undrained shear strength;
+            effectiveCohesion_safetyF = 1.4;
+        }
+    }
+
     double L = 1, B = 1;
     if (belastingsType.type == 0) {
         L = belastingsType.x1;
@@ -792,15 +807,16 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
     double s_q = 1;
     double s_g = 1;
     double s_c = 1;
-    double N_q = exp(pi * tan(phi_inRads)) * tan(pi / 4.0 + phi_inRads / 2) *
+    double N_q = exp(pi * tan(phi_inRads) / phi_partialSafetyF) *
+                 tan(pi / 4.0 + phi_inRads / 2) *
                  tan(pi / 4.0 + phi_inRads / 2);
     double N_c = 0;
     if (phi_inRads != 0) {
-        N_c = (N_q - 1) / tan(phi_inRads);
+        N_c = (N_q - 1) / tan(phi_inRads) * phi_partialSafetyF;
     } else if (phi_inRads == 0) {
         N_c = pi + 2;
     }
-    double N_g = 2 * (N_q - 1) * tan(phi_inRads);
+    double N_g = 2 * (N_q - 1) * tan(phi_inRads) / phi_partialSafetyF;
     double p_t = getEffectieveOpDiepte(grondlagen.front().bovengrens -
                                        belastingsType.aanzetshoogte);
     double d_c = 1;
@@ -814,11 +830,13 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
     }
     double g_k = massaGew;
 
-    double _qu =
-        d_q * s_q * N_q * p_t + d_c * s_c * N_c * c + s_g * N_g * g_k * B / 2.0;
+    double _qu = d_q * s_q * N_q * p_t +
+                 d_c * s_c * N_c * c / effectiveCohesion_safetyF +
+                 s_g * N_g * g_k * B / 2.0;
     // std::cout << "q_u = d_q*s_q*N_q*p_t+d_c*s_c*N_c*c+s_g*N_g*g_k*B/2\n"
     //           << d_q << "*" << s_q << "*" << N_q << "*" << p_t << "+" << d_c
-    //           << "*" << s_c << "*" << N_c << "*" << c << "+" << s_g << "*"
+    //           << "*" << s_c << "*" << N_c << "*" << c << "/" <<
+    //           effectiveCohesion_safetyF  << "+" << s_g << "*"
     //           << N_g << "*" << g_k << "*" << B << "/" << 2.0 << "=" << _qu
     //           << "\n"
     //           << std::endl;
