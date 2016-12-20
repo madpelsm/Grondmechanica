@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <fstream>
 
 using json = nlohmann::json;
 
@@ -94,6 +95,7 @@ class Zettingsberekening {
     void setLowestPhea(double Fea_2);
     void berekenSecZetting();
     void wijzigBelastingsType(BelastingsType b);
+    void writeToCSV();
     double getTotaleZetting();
     void setPhea(double fea);
     std::string shout();

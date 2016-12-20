@@ -360,6 +360,7 @@ void Zettingsberekening::berekenZetting() {
         }
         totalePrimaireZetting = tot;
         done = true;
+        // writeToCSV();
     }
 }
 
@@ -384,6 +385,36 @@ void Zettingsberekening::wijzigBelastingsType(BelastingsType b) {
     belastingsType = b;
     gen_msg();
     done = false;
+}
+
+void Zettingsberekening::writeToCSV() {
+    if (!grondlagen.empty()) {
+        std::string fileName = grondlagen.front().Naam;
+        fileName += ".csv";
+        std::ofstream targetFile;
+        targetFile.open(fileName);
+        targetFile << "sigmsEff,deltaSig,deltaZetting\n";
+        for (unsigned int i = 0; i < dSigma_eff.size(); i++) {
+            targetFile << dSigma_eff[i] << ",";
+            int j = i - (dSigma_eff.size() - dDelta_sigma.size());
+            if (j < 0) {
+                targetFile << 0 << ",";
+            } else {
+                if (j < dDelta_sigma.size()) {
+                    targetFile << dDelta_sigma[j] << ",";
+                }
+            }
+            int k = i - (dSigma_eff.size() - dZettingPrim.size());
+            if (k < 0) {
+                targetFile << 0 << "\n";
+            } else {
+                if (k < dZettingPrim.size()) {
+                    targetFile << dZettingPrim[k] << "\n";
+                }
+            }
+        }
+        targetFile.close();
+    }
 }
 
 double Zettingsberekening::getTotaleZetting() { return totalePrimaireZetting; }
