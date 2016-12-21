@@ -66,8 +66,8 @@ class Zettingsberekening {
     double totalePrimaireZetting = 0;
     std::string message;
     int decimalPrecisionInShout = 3;
-
    public:
+    bool gotHCR = false;
     bool done = false;
     json zettingsBerekeningJS;
     std::vector<double> dZettingPrim, dDelta_sigma, dSigma_eff, graphDzetting,
@@ -76,6 +76,7 @@ class Zettingsberekening {
         belastingsType;  // bepaal adhv dit de formule voor de belasting
     double fea = 0, sumPrecision = 1000, PI = 4 * atan(1), waterGewicht = 9.81,
            lowestPhea = 0;
+    double Hcr_tsa =9e10,Hcr_esa = 9e10;
     double pi = 4 * atan(1);
     double q_u_ESA = 0, q_u_TSA = 0,
            maxZettingT = 0.000001;  // evenwichtsdraagvermogen
@@ -117,5 +118,7 @@ class Zettingsberekening {
     double getDrainageLength(Grond &onder, Grond &huidig, Grond &boven);
     void setPosition(double xCons, double yCons);
     double calculateq_u(double c, double phi, double massaGew);
+    double getH_cr(double phi);
     double getSU(double c, double phi, double sigma);
+    void writeConfigToCsv();
 };

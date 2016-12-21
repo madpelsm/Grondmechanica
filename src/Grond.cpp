@@ -229,8 +229,10 @@ void Zettingsberekening::berekenZetting() {
         maxZettingT = 0.00000001;
         double effectieveSpanningOpZ = 0;
         double diepte = 0;
+        double Teller2 = 0;
         double totZetting = 0;
         double dDelt_sigma = 0;
+        double nieuweSigmEff = 0;
         double critcalMassWeight = 0;
         double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
         // placeholder for c and phi, find the lowest s_u
@@ -259,6 +261,7 @@ void Zettingsberekening::berekenZetting() {
                 }
             }
             while ((j + (double)gridSize) < grondlagen[i].laagdikte) {
+                zettingT = 0;
                 diepte += gridSize;
                 // als onder water
                 if ((grondlagen[i].bovengrens - j) < fea) {
@@ -294,6 +297,21 @@ void Zettingsberekening::berekenZetting() {
                             xPositie, yPositie) *
                         (belastingsType.qs - sigma_eff_op_aanzet);
                     dDelta_sigma.push_back(dDelt_sigma);
+                    nieuweSigmEff = effectieveSpanningOpZ - sigma_eff_op_aanzet;
+                    Teller2 =
+                        (sigma_eff_op_aanzet *
+                         belastingsType.deltaSig(
+                             (((grondlagen.front().bovengrens - diepte) < 0)
+                                  ? 0
+                                  : grondlagen.front().bovengrens - diepte),
+                             xPositie, yPositie));
+
+                    if (nieuweSigmEff > 0) {
+                        double Temp =
+                            gridSize / grondlagen[i].ontlastingsconstante *
+                            log((Teller2 + nieuweSigmEff) / (nieuweSigmEff));
+                        zettingT += (Temp < 1e10) ? Temp : 0;
+                    }
                 }
                 // hieronder. zal altijd false zijn als ocr =1 en ddelt_sigma >0
                 if ((dDelt_sigma + effectieveSpanningOpZ) <
@@ -302,7 +320,7 @@ void Zettingsberekening::berekenZetting() {
                     lnGedeelte =
                         std::log((dDelt_sigma + effectieveSpanningOpZ) /
                                  (effectieveSpanningOpZ));
-                    zettingT = (double)(HOverC * lnGedeelte);
+                    zettingT += (double)(HOverC * lnGedeelte);
 
                 } else {
                     // deel belasting if not overgeconsolideerd
@@ -311,9 +329,10 @@ void Zettingsberekening::berekenZetting() {
                         std::log((dDelt_sigma + effectieveSpanningOpZ) /
                                  (effectieveSpanningOpZ * grondlagen[i].OCR));
 
-                    zettingT = (double)(HOverC * lnGedeelte) +
-                               (gridSize / grondlagen[i].ontlastingsconstante) *
-                                   std::log(grondlagen[i].OCR);
+                    zettingT +=
+                        +(double)(HOverC * lnGedeelte) +
+                        (gridSize / grondlagen[i].ontlastingsconstante) *
+                            std::log(grondlagen[i].OCR);
                 }
                 finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
                 // in ln : verhoogde op heersende
@@ -331,20 +350,34 @@ void Zettingsberekening::berekenZetting() {
             grondlagen[i].primZetting = laagzetting;
             // std::cout<<laagzetting<<std::endl;
             if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
-                (diepte - grondlagen[i].bovengrens +
-                     belastingsType.aanzetshoogte <
-                 2 * belastingsType.belastingsBreedte)) {
+                !gotHCR) {
+                Hcr_tsa = getH_cr(grondlagen[i].phi);
+                Hcr_esa = getH_cr(grondlagen[i].phi_a);
+                gotHCR = true;
+            }
+
+            if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
+                (grondlagen[i].bovengrens >
+                 (belastingsType.aanzetshoogte - Hcr_esa))) {
                 double tempQUESA = calculateq_u(
                     grondlagen[i].c_a, grondlagen[i].phi_a, critcalMassWeight);
                 if (tempQUESA < q_u_ESA && tempQUESA != 0) {
                     q_u_ESA = tempQUESA;
                 }
+                if (getH_cr(grondlagen[i].phi_a) > Hcr_esa) {
+                    Hcr_esa = getH_cr(grondlagen[i].phi_a);
+                }
             }
-            if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte) {
+            if (grondlagen[i].ondergrens < belastingsType.aanzetshoogte &&
+                (grondlagen[i].bovengrens >
+                 (belastingsType.aanzetshoogte - Hcr_tsa))) {
                 double tempQUTSA = calculateq_u(
                     grondlagen[i].c, grondlagen[i].phi, critcalMassWeight);
                 if (tempQUTSA < q_u_TSA && tempQUTSA != 0) {
                     q_u_TSA = tempQUTSA;
+                }
+                if (getH_cr(grondlagen[i].phi) > Hcr_tsa) {
+                    Hcr_tsa = getH_cr(grondlagen[i].phi);
                 }
             }
         }
@@ -360,8 +393,16 @@ void Zettingsberekening::berekenZetting() {
         }
         totalePrimaireZetting = tot;
         done = true;
+        writeConfigToCsv();
         // writeToCSV();
     }
+}
+
+double Zettingsberekening::getH_cr(double phi) {
+    double phiInRad = phi / 180 * pi;
+    double A = pi / 4 - phiInRad / 2;
+    return belastingsType.x2 / (2 * cos(pi / 4 + phiInRad / 2)) *
+           exp(A * tan(phiInRad));
 }
 
 void Zettingsberekening::berekenSecZetting() {
@@ -876,4 +917,30 @@ double Zettingsberekening::calculateq_u(double c, double _phi,
 
 double Zettingsberekening::getSU(double c, double phi, double sigma) {
     return c + sigma * abs(std::tan(phi / (180.0) * pi));
+}
+
+void Zettingsberekening::writeConfigToCsv() {
+    if (!grondlagen.empty()) {
+        std::string fileName = grondlagen.front().Naam;
+        fileName += "Log.csv";
+        std::ofstream targetFile;
+        targetFile.open(fileName);
+
+        targetFile << "feaHoog," << fea << "feaLaag," << lowestPhea << "\n";
+        targetFile << "Grondnaam,bovengrens,ondergrens,C,A,c_v,k_z,phi,c,phi_a,"
+                      "c_a,primZetting,droog,nat\n";
+        for (unsigned int i = 0; i < grondlagen.size(); i++) {
+            targetFile << grondlagen[i].Naam << "," << grondlagen[i].bovengrens
+                       << "," << grondlagen[i].ondergrens << ","
+                       << grondlagen[i].samendrukkingsCoeff << ","
+                       << grondlagen[i].ontlastingsconstante << ","
+                       << grondlagen[i].c_v << "," << grondlagen[i].k_s << ","
+                       << grondlagen[i].phi << "," << grondlagen[i].c << ","
+                       << grondlagen[i].phi_a << "," << grondlagen[i].c_a << ","
+                       << grondlagen[i].primZetting << ","
+                       << grondlagen[i].drogeMassDichtheid << ","
+                       << grondlagen[i].natteMassadichtheid << "\n";
+        }
+        targetFile.close();
+    }
 }
