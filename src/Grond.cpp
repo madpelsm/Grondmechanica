@@ -1,4 +1,6 @@
 #include <Grond.h>
+// In here 'ontlastingsconstante' actually means the rico along the URL, so it
+// is in fact the 'herbelastingsconstante'
 Grond::Grond(float _samendrukkingscoeff, float _bovengrens, float _ondergrens,
              float _drogeMassaDichtheid, std::string _Naam, double c_v,
              double k_s = 0.0, double _nattemassadichtheid, double _OCR,
@@ -79,11 +81,11 @@ void Grond::gen_msg() {
 
     str << "Grondlaag " << Naam << "\nsamendrukkingscoefficient C: "
         << std::setprecision(decimalPrecisionInShout) << samendrukkingsCoeff
-        << "\nOntlastingsconstante: " << ontlastingsconstante << "\nOCR:" << OCR
-        << " \n De laag gaat van " << std::setprecision(decimalPrecisionInShout)
-        << (bovengrens) << "m tot "
-        << std::setprecision(decimalPrecisionInShout) << (ondergrens)
-        << "m\n droge massadichtheid: "
+        << "\nHerbelastingsconstante: " << ontlastingsconstante
+        << "\nOCR:" << OCR << " \n De laag gaat van "
+        << std::setprecision(decimalPrecisionInShout) << (bovengrens)
+        << "m tot " << std::setprecision(decimalPrecisionInShout)
+        << (ondergrens) << "m\n droge massadichtheid: "
         << std::setprecision(decimalPrecisionInShout) << (drogeMassDichtheid)
         << "kN/m^3\nNatte massadichtheid: " << natteMassadichtheid
         << "kN/m^3\nmet C_v: " << c_v << "m^2/s\n"

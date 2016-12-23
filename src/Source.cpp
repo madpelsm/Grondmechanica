@@ -30,7 +30,7 @@ double laagsteFea = 0, lowestFe = 0.0000000123;
 double bovengrens, ondergrens, samendrukkingsconstante, drogeMassadichtheid,
     aanzetshoogte = 0, xPos, yPos = 0, sonderingsnummer, feaHoogte,
     natteMassadichtheid, beginPosLast, eindPosLast, lastGrootte, c_v = 0.0,
-    k_s = 0.0, tijd = 1, OCR = 1, ontlastingsconstante = 1,
+    k_s = 0.0, tijd = 1, OCR = 1, herbelastingsconstante = 1,
     c_alpha1 = 0.00000001;
 double c = 0, c_a = 0, phi = 0, phi_a = 0;
 int WIDTH = 1000, HEIGHT = 800, pointPrecisionInDialog = 5;
@@ -44,7 +44,7 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
                               double drogemassadichtheid, std::string grondnaam,
                               int sondering, Screen *screen, double c_v,
                               double k_s, double natteMassaDichtheid,
-                              double _OCR, double _ontlastingsconstante,
+                              double _OCR, double _herbelastingsconstante,
                               double c, double phi, double c_a, double phi_a,
                               double c_alpha);
 void genereerLast(double beginPosLast, double eindPosLast, double lastGrootte,
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
     grondGUI->addGroup("Mechanische parameters");
     grondGUI->addVariable("Samendrukkingsconstante C", samendrukkingsconstante)
         ->setTooltip("Geprefereerd de C uit de laboproeven.");
-    grondGUI->addVariable("Ontlastingsconstante", ontlastingsconstante);
+    grondGUI->addVariable("Herbelastingsconstante", herbelastingsconstante);
     grondGUI->addVariable("OCR", OCR);
     grondGUI->addVariable("Droge massadichtheid kN/m^3", drogeMassadichtheid);
     grondGUI->addVariable("Natte massadichtheid kN/m^3", natteMassadichtheid);
@@ -171,15 +171,15 @@ int main(int argc, char *argv[]) {
     grondGUI->addVariable("phi'", phi_a)->setTooltip("for ESA, i.e. drained");
     grondGUI->addVariable("c_alpha", c_alpha1);
     grondGUI->addButton("Voeg grondlaag toe", [&screen, &config]() {
-        if (OCR > 1 && ontlastingsconstante == 0) {
+        if (OCR > 1 && herbelastingsconstante == 0) {
             MessageDialog *m = new MessageDialog(
                 screen, MessageDialog::Type::Warning, "OCR fout",
-                "Ontlastingsconstante kan niet 0 zijn als OCR>1", "ok");
+                "Herbelastingsconstante kan niet 0 zijn als OCR>1", "ok");
         } else {
             addSolidLayerToSondering(
                 bovengrens, ondergrens, samendrukkingsconstante,
                 drogeMassadichtheid, grondnaam, sonderingsnummer, screen, c_v,
-                k_s, natteMassadichtheid, OCR, ontlastingsconstante, c, phi,
+                k_s, natteMassadichtheid, OCR, herbelastingsconstante, c, phi,
                 c_a, phi_a, c_alpha1);
         }
         updateConfigText(config);
@@ -502,14 +502,14 @@ void addSolidLayerToSondering(double bovengrens, double ondergrens,
                               double drogemassadichtheid, std::string grondnaam,
                               int sondering, Screen *screen, double c_v,
                               double k_s, double natteMassadichtheid,
-                              double _OCR, double _ontlastingsconstante,
+                              double _OCR, double _herbelastingsconstante,
                               double c, double phi, double c_a, double phi_a,
                               double c_alpha) {
     if ((sondering) < sonderingsPunt.size()) {
         sonderingsPunt[sondering].addGrondlaag(
             Grond(samendrukkingsconstante, bovengrens, ondergrens,
                   drogemassadichtheid, grondnaam, c_v, k_s, natteMassadichtheid,
-                  _OCR, _ontlastingsconstante, c, c_a, phi, phi_a));
+                  _OCR, _herbelastingsconstante, c, c_a, phi, phi_a));
         std::string t =
             sonderingsPunt[sondering]
                 .grondlagen[sonderingsPunt[sondering].grondlagen.size() - 1]
