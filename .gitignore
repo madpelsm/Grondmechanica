@@ -1,4 +1,6 @@
 .vs/
+*.csv
+*.py
 gitattributes
 Debug/
 Debug
