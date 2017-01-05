@@ -297,47 +297,33 @@ void Zettingsberekening::berekenZetting() {
                                           : grondlagen.front().bovengrens -
                                                 belastingsType.aanzetshoogte),
                             xPositie, yPositie) *
-                        (belastingsType.qs - sigma_eff_op_aanzet);
+                        (belastingsType.qs-sigma_eff_op_aanzet);
                     dDelta_sigma.push_back(dDelt_sigma);
                     nieuweSigmEff = effectieveSpanningOpZ - sigma_eff_op_aanzet;
-                    Teller2 =
-                        (sigma_eff_op_aanzet *
-                         belastingsType.deltaSig(
-                             (((grondlagen.front().bovengrens - diepte) < 0)
-                                  ? 0
-                                  : grondlagen.front().bovengrens - diepte),
-                             xPositie, yPositie));
+                    
+                    if ((dDelt_sigma + effectieveSpanningOpZ) <
+                        effectieveSpanningOpZ * grondlagen[i].OCR) {
+                        HOverC = (gridSize) / (grondlagen[i].ontlastingsconstante);
+                        lnGedeelte =
+                            std::log((dDelt_sigma + effectieveSpanningOpZ) /
+                            (effectieveSpanningOpZ));
+                        zettingT += (double)(HOverC * lnGedeelte);
 
-                    if (nieuweSigmEff > 0) {
-                        double Temp =
-                            gridSize / grondlagen[i].ontlastingsconstante *
-                            log((Teller2 + nieuweSigmEff) / (nieuweSigmEff));
-                        zettingT += (Temp < 1e10) ? Temp : 0;
                     }
-                }
-                // hieronder. zal altijd false zijn als ocr =1 en ddelt_sigma >0
-                if ((dDelt_sigma + effectieveSpanningOpZ) <
-                    effectieveSpanningOpZ * grondlagen[i].OCR) {
-                    HOverC = (gridSize) / (grondlagen[i].ontlastingsconstante);
-                    lnGedeelte =
-                        std::log((dDelt_sigma + effectieveSpanningOpZ) /
-                                 (effectieveSpanningOpZ));
-                    zettingT += (double)(HOverC * lnGedeelte);
+                    else {
+                        HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
+                        lnGedeelte =
+                            std::log((dDelt_sigma + effectieveSpanningOpZ) /
+                            (effectieveSpanningOpZ * grondlagen[i].OCR));
 
-                } else {
-                    // deel belasting if not overgeconsolideerd
-                    HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
-                    lnGedeelte =
-                        std::log((dDelt_sigma + effectieveSpanningOpZ) /
-                                 (effectieveSpanningOpZ * grondlagen[i].OCR));
+                        zettingT +=
+                            (double)(HOverC * lnGedeelte) +
+                            (gridSize / grondlagen[i].ontlastingsconstante) *
+                            std::log(grondlagen[i].OCR*(nieuweSigmEff!=0)?effectieveSpanningOpZ/nieuweSigmEff:1);
+                    }
 
-                    zettingT +=
-                        +(double)(HOverC * lnGedeelte) +
-                        (gridSize / grondlagen[i].ontlastingsconstante) *
-                            std::log(grondlagen[i].OCR);
                 }
                 finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
-                // in ln : verhoogde op heersende
                 laagzetting += zettingT;
                 // stockeer waarden voor latere preview
                 if (zettingT != 0) {
