@@ -1,5 +1,5 @@
 #pragma once
-#include <stdlib.h>
+#include <cmath>
 #include <algorithm>
 #include <iomanip>
 #include <iostream>

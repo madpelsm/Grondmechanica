@@ -297,31 +297,34 @@ void Zettingsberekening::berekenZetting() {
                                           : grondlagen.front().bovengrens -
                                                 belastingsType.aanzetshoogte),
                             xPositie, yPositie) *
-                        (belastingsType.qs-sigma_eff_op_aanzet);
+                        (belastingsType.qs - sigma_eff_op_aanzet);
                     dDelta_sigma.push_back(dDelt_sigma);
                     nieuweSigmEff = effectieveSpanningOpZ - sigma_eff_op_aanzet;
-                    
+
                     if ((dDelt_sigma + effectieveSpanningOpZ) <
                         effectieveSpanningOpZ * grondlagen[i].OCR) {
-                        HOverC = (gridSize) / (grondlagen[i].ontlastingsconstante);
+                        HOverC =
+                            (gridSize) / (grondlagen[i].ontlastingsconstante);
                         lnGedeelte =
                             std::log((dDelt_sigma + effectieveSpanningOpZ) /
-                            (effectieveSpanningOpZ));
+                                     (effectieveSpanningOpZ));
                         zettingT += (double)(HOverC * lnGedeelte);
 
-                    }
-                    else {
-                        HOverC = (gridSize) / (grondlagen[i].samendrukkingsCoeff);
-                        lnGedeelte =
-                            std::log((dDelt_sigma + effectieveSpanningOpZ) /
+                    } else {
+                        HOverC =
+                            (gridSize) / (grondlagen[i].samendrukkingsCoeff);
+                        lnGedeelte = std::log(
+                            (dDelt_sigma + effectieveSpanningOpZ) /
                             (effectieveSpanningOpZ * grondlagen[i].OCR));
 
                         zettingT +=
                             (double)(HOverC * lnGedeelte) +
                             (gridSize / grondlagen[i].ontlastingsconstante) *
-                            std::log(grondlagen[i].OCR*(nieuweSigmEff!=0)?effectieveSpanningOpZ/nieuweSigmEff:1);
+                                std::log(
+                                    grondlagen[i].OCR * (nieuweSigmEff != 0)
+                                        ? effectieveSpanningOpZ / nieuweSigmEff
+                                        : 1);
                     }
-
                 }
                 finaleSpanningOpZ = effectieveSpanningOpZ + dDelt_sigma;
                 laagzetting += zettingT;
