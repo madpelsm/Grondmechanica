@@ -234,6 +234,7 @@ void Zettingsberekening::berekenZetting() {
         double Teller2 = 0;
         double totZetting = 0;
         double dDelt_sigma = 0;
+        double sigma_tot_op_aanzet = 0;
         double nieuweSigmEff = 0;
         double critcalMassWeight = 0;
         double finaleSpanningOpZ = 0, HOverC = 0, lnGedeelte = 0, zettingT = 0;
@@ -282,11 +283,11 @@ void Zettingsberekening::berekenZetting() {
                     totaleSpanningOpZ +=
                         (grondlagen[i].drogeMassDichtheid) * gridSize;
                 }
-                // TODO check dit
                 if ((grondlagen.front().bovengrens - diepte) <=
                     belastingsType.aanzetshoogte) {
                     if (!corrected) {
                         sigma_eff_op_aanzet = effectieveSpanningOpZ;
+                        sigma_tot_op_aanzet = totaleSpanningOpZ;
                         corrected = true;
                     }
                     dDelt_sigma =
@@ -297,7 +298,10 @@ void Zettingsberekening::berekenZetting() {
                                           : grondlagen.front().bovengrens -
                                                 belastingsType.aanzetshoogte),
                             xPositie, yPositie) *
-                        (belastingsType.qs - sigma_eff_op_aanzet);
+                        (belastingsType.qs -
+                         sigma_tot_op_aanzet);  // change to sigma_eff_op_aanzet
+                                                // for porous object
+                    // non-porous objects experience uplift
                     dDelta_sigma.push_back(dDelt_sigma);
                     nieuweSigmEff = effectieveSpanningOpZ - sigma_eff_op_aanzet;
 
